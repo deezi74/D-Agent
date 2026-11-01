@@ -383,7 +383,10 @@ class AgentRunner(private val g: Graph) {
      * The guard every run goes through. The reviewer (a second look at steps that reach people or
      * spend money) uses the same model; it's skipped for on-phone models, which are too slow for it.
      */
-    private fun guard(client: LlmClient, model: String, isLocal: Boolean, background: Boolean) = Guard(
+    private fun guard(client: LlmClient, model: String, isLocal: Boolean, background: Boolean): Guard? = runCatching { makeGuard(client, model, isLocal, background) }
+        .onFailure { android.util.Log.e("DAgent", "Guard unavailable", it) }.getOrNull()
+
+    private fun makeGuard(client: LlmClient, model: String, isLocal: Boolean, background: Boolean) = Guard(
         rules = { g.guardSettings.rules.value },
         sink = g.activity,
         secrets = g.vault,

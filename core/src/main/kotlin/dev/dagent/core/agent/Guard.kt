@@ -182,7 +182,8 @@ class Guard(
     }
 
     companion object {
-        val PLACEHOLDER = Regex("\\{\\{\\s*vault:([^}]+)}}")
+        // Every brace escaped: Android's regex engine (ICU) rejects a bare "}" that Java accepts.
+        val PLACEHOLDER = Regex("\\{\\{\\s*vault:([^\\}]+)\\}\\}")
 
         /** Tools whose output comes from strangers: web pages, search results, mail, code. */
         val UNTRUSTED = setOf("web_fetch", "web_search", "browser", "email", "github")
