@@ -75,9 +75,9 @@ object Providers {
             keyRequired = false, blurb = "An Ollama server on this phone (Termux) or your network.",
         ),
         ProviderPreset(
-            "lmstudio", "LM Studio (PC)", ApiKind.OPENAI, "http://192.168.1.100:1234/v1", "",
+            "lmstudio", "LM Studio (PC)", ApiKind.OPENAI, "", "",
             keyRequired = false,
-            blurb = "Models running on your computer in LM Studio. In LM Studio's Developer tab start the server with 'Serve on local network' on, then put your PC's address here (ipconfig shows it). Use the model name LM Studio lists.",
+            blurb = "Models running on your computer in LM Studio. In LM Studio's Developer tab start the server with 'Serve on local network' on, then put the 'Reachable at' address it shows here with /v1 on the end, like http://192.168.1.113:1234/v1. Use the model name LM Studio lists.",
         ),
         ProviderPreset(
             "custom", "Custom (OpenAI-compatible)", ApiKind.OPENAI, "http://localhost:8080/v1", "",
