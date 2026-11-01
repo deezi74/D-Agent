@@ -1,0 +1,60 @@
+package dev.dagent
+
+import android.app.Application
+import android.content.Context
+import dev.dagent.agent.AgentRunner
+import dev.dagent.browser.BrowserAgent
+import dev.dagent.core.agent.MemoryStore
+import dev.dagent.core.agent.SkillLibrary
+import dev.dagent.core.tools.WebSearch
+import dev.dagent.core.tools.Workspace
+import dev.dagent.data.ChatStore
+import dev.dagent.data.Settings
+import dev.dagent.linux.LinuxComputer
+import dev.dagent.linux.PhoneBridge
+import dev.dagent.local.LocalModels
+import dev.dagent.phone.Interactions
+import dev.dagent.phone.PhoneActions
+import dev.dagent.phone.Speaker
+import dev.dagent.schedule.Scheduler
+import okhttp3.OkHttpClient
+import java.io.File
+import java.util.concurrent.TimeUnit
+
+class DAgentApp : Application() {
+    lateinit var graph: Graph
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        graph = Graph(this)
+        PhoneActions.ensureChannel(this)
+        BuiltinSkills.install(this, graph.skills)
+    }
+}
+
+/** Every long-lived object in the app, built once. */
+class Graph(val context: Context) {
+    val http: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(300, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
+
+    val settings = Settings(context)
+    val chats = ChatStore(context.filesDir)
+    val workspace = Workspace(File(context.filesDir, "workspace"))
+    val memory = MemoryStore(File(context.filesDir, "memory"))
+    val skills = SkillLibrary(File(context.filesDir, "skills"))
+    val interactions = Interactions(context)
+    val speaker by lazy { Speaker(context) }
+    val phone = PhoneActions(context, interactions, { settings.current.confirmRisky }, { speaker.say(it) })
+    val bridge = PhoneBridge { action, args -> phone.run(action, args) }.also { it.start() }
+    val linux = LinuxComputer(context, workspace.root, skills.dir, bridge, http).also { if (it.installed) it.configure() }
+    val browser = BrowserAgent(context)
+    val local = LocalModels(context)
+    val search = WebSearch(http) { settings.current.searxUrl }
+    val scheduler = Scheduler(context)
+    val runner = AgentRunner(this)
+}
