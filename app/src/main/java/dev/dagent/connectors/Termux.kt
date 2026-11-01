@@ -86,7 +86,52 @@ class TermuxBridge(private val context: Context) {
         } ?: Result("", "", null, "no answer from Termux within ${timeoutMs / 1000}s. For long work use action \"start\" (runs in the background).")
     }
 
+    /** Termux from the Play Store is years old and ignores commands from other apps. */
+    fun isOutdated(): Boolean = runCatching {
+        val info = context.packageManager.getPackageInfo(TERMUX, 0)
+        @Suppress("DEPRECATION") val code = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+        code < 118
+    }.getOrDefault(false)
+
+    /** True when something answers on 127.0.0.1:[port]. */
+    suspend fun portOpen(port: Int): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        runCatching { java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 400) }; true }.getOrDefault(false)
+    }
+
+    /**
+     * Opens a visible Termux session running [script], the same way the person starts a server by
+     * hand. Termux keeps foreground sessions alive, so long-running servers survive.
+     */
+    fun openSession(script: String, label: String): String? = runCatching {
+        val intent = Intent("com.termux.RUN_COMMAND")
+            .setComponent(ComponentName(TERMUX, "com.termux.app.RunCommandService"))
+            .putExtra("com.termux.RUN_COMMAND_PATH", "$PREFIX/bin/bash")
+            .putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf("-lc", script))
+            .putExtra("com.termux.RUN_COMMAND_WORKDIR", HOME)
+            .putExtra("com.termux.RUN_COMMAND_BACKGROUND", false)
+            .putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "1") // open the session but stay in D-Agent
+            .putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", label)
+        try { context.startService(intent) } catch (e: IllegalStateException) { context.startForegroundService(intent) }
+        null
+    }.getOrElse { it.message ?: "Termux refused the command" }
+
+    /** Last resort: put [command] on the clipboard and open Termux so the person can paste it. */
+    suspend fun pasteFallback(command: String) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("Termux command", command))
+        context.packageManager.getLaunchIntentForPackage(TERMUX)?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    /** What's missing before D-Agent can run commands in Termux, or null when it's ready. */
+    fun problem(): String? = when {
+        !isInstalled() -> "Termux isn't installed. Get it from F-Droid (f-droid.org/packages/com.termux), not the Play Store."
+        isOutdated() -> "This Termux is the old Play Store version, which doesn't accept commands from other apps. Install Termux from F-Droid instead."
+        !hasPermission() -> "D-Agent needs permission to run Termux commands: open Settings > Connectors > Termux and tap Allow."
+        else -> null
+    }
+
     companion object {
+        const val FREELLMAPI_COMMAND = "cd ~/freellmapi && termux-wake-lock && npm run dev"
         const val TERMUX = "com.termux"
         const val PERMISSION = "com.termux.permission.RUN_COMMAND"
         const val PREFIX = "/data/data/com.termux/files/usr"
@@ -112,10 +157,10 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
     }
 
     override suspend fun run(args: Args, ctx: ToolContext): ToolResult {
-        if (!enabled()) return ToolResult.error("The Termux connector is off. The person can turn it on in Settings > Connectors > Termux.")
-        if (!termux.isInstalled()) return ToolResult.error("Termux isn't installed on this phone (get it from F-Droid).")
         val arguments = args
         val action = arguments.string("action")?.lowercase(Locale.US) ?: "run"
+        if (action == "freellmapi") return startFreeLlmApi(ctx)
+        termux.problem()?.let { return ToolResult.error(it + SETUP_HINT) }
         return when (action) {
             "run", "exec" -> {
                 val cmd = arguments.string("command") ?: return ToolResult.error("missing \"command\"")
@@ -142,10 +187,37 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
                 val clean = homePath(path) ?: return ToolResult.error("path must stay inside the Termux home folder")
                 report(termux.run(writeScript(mapOf(clean to content))), ok = "Wrote ~/$clean")
             }
-            "freellmapi" -> startJob(FREELLMAPI_SCRIPT)
             "setup_android" -> startJob(SETUP_SCRIPT)
             else -> ToolResult.error("unknown action \"$action\"")
         }
+    }
+
+    /**
+     * Starts FreeLLMAPI the way the person does by hand (a visible Termux session), then waits for
+     * port 3001. If Termux can't take commands, copies the command and opens Termux to paste it.
+     */
+    suspend fun startFreeLlmApi(ctx: ToolContext): ToolResult {
+        if (termux.portOpen(3001)) return ToolResult.ok("FreeLLMAPI is already running on http://localhost:3001/v1.")
+        val problem = termux.problem()
+        if (problem != null) {
+            if (!termux.isInstalled() || termux.isOutdated()) return ToolResult.error(problem)
+            termux.pasteFallback(FREELLMAPI_START)
+            return ToolResult.ok("$problem\nFor now I copied the start command and opened Termux: the person just long-presses, pastes and presses Enter. Tell them that.")
+        }
+        ctx.progress("Starting FreeLLMAPI in Termux...")
+        termux.openSession(FREELLMAPI_SCRIPT, "FreeLLMAPI")?.let { err ->
+            termux.pasteFallback(FREELLMAPI_START)
+            return ToolResult.ok("Termux didn't take the command ($err$SETUP_HINT). I copied the start command and opened Termux so the person can paste it and press Enter.")
+        }
+        val deadline = System.currentTimeMillis() + 90_000
+        while (System.currentTimeMillis() < deadline) {
+            kotlinx.coroutines.delay(2_000)
+            if (termux.portOpen(3001)) return ToolResult.ok("FreeLLMAPI is running on http://localhost:3001/v1 (a Termux session named FreeLLMAPI keeps it going).")
+        }
+        val log = termux.run("ls -d ~/freellmapi >/dev/null 2>&1 && echo HAS_DIR || echo NO_DIR", 15_000)
+        if (log.stdout.contains("NO_DIR")) return ToolResult.error("There's no ~/freellmapi folder in Termux, so there's nothing to start. Clone FreeLLMAPI into ~/freellmapi first.")
+        return ToolResult.error("Started FreeLLMAPI in Termux but port 3001 didn't open within 90 seconds. Ask the person to open Termux and look at the FreeLLMAPI session for the error." +
+            if (log.error != null) " (Termux also said: ${log.error}$SETUP_HINT)" else "")
     }
 
     suspend fun startJob(cmd: String): ToolResult {
@@ -201,6 +273,9 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
     companion object {
         private val JOB = Regex("^job[a-z0-9]{4,16}$")
         private const val MAX = 6000
+
+        const val FREELLMAPI_START = TermuxBridge.FREELLMAPI_COMMAND
+        const val SETUP_HINT = ". One-time Termux setup: in Termux run  echo allow-external-apps=true >> ~/.termux/termux.properties && termux-reload-settings  then allow D-Agent in Settings > Connectors > Termux"
 
         /** Starts FreeLLMAPI in Termux the way the person runs it: ~/freellmapi, wake lock, npm run dev. */
         val FREELLMAPI_SCRIPT = """

@@ -200,6 +200,8 @@ private fun TermuxSection(g: Graph) {
     val context = LocalContext.current
     var on by remember { mutableStateOf(g.connectors.termuxOn) }
     var allowed by remember { mutableStateOf(g.termux.hasPermission()) }
+    var status by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed = it }
     Section("Termux")
     Card {
@@ -214,6 +216,23 @@ private fun TermuxSection(g: Graph) {
                 if (!allowed) TextButton({ ask.launch(TermuxBridge.PERMISSION) }) { Text("Allow") }
             }
             ToggleRow("3. Use Termux", "Adds the termux tool", on) { on = it; g.connectors.termuxOn = it }
+            if (g.termux.isOutdated()) Text("This is the old Play Store Termux, which ignores other apps. Install Termux from F-Droid.", color = p.bad, fontSize = 13.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({
+                    val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Termux setup", "mkdir -p ~/.termux && echo allow-external-apps=true >> ~/.termux/termux.properties && termux-reload-settings"))
+                    context.packageManager.getLaunchIntentForPackage("com.termux")?.let { context.startActivity(it) }
+                    status = "Setup command copied. In Termux, long-press, Paste, then Enter."
+                }) { Text("Copy step 1 & open Termux") }
+            }
+            Button({
+                status = "Starting FreeLLMAPI..."
+                scope.launch {
+                    status = dev.dagent.connectors.TermuxTool(g.termux) { true }
+                        .startFreeLlmApi(object : dev.dagent.core.agent.ToolContext { override val sessionId = "" }).text
+                }
+            }, colors = ButtonDefaults.buttonColors(containerColor = p.accent)) { Text("Start FreeLLMAPI") }
+            if (status.isNotBlank()) Muted(status)
         }
     }
 }

@@ -271,17 +271,15 @@ class AgentRunner(private val g: Graph) {
         val port = if (uri.port > 0) uri.port else 80
         fun open() = runCatching { java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 400) }; true }.getOrDefault(false)
         if (withContext(Dispatchers.IO) { open() }) return
-        val canStart = port == 3001 && g.termux.isInstalled() && g.termux.hasPermission()
-        if (!canStart) throw IllegalStateException(Providers.explainNetwork("failed to connect", baseUrl))
+        if (port != 3001 || !g.termux.isInstalled()) throw IllegalStateException(Providers.explainNetwork("failed to connect", baseUrl))
         _state.update { it.copy(notice = "Starting FreeLLMAPI in Termux...") }
-        TermuxTool(g.termux) { true }.startJob(dev.dagent.connectors.TermuxTool.FREELLMAPI_SCRIPT)
-        val deadline = System.currentTimeMillis() + 60_000
-        while (System.currentTimeMillis() < deadline) {
-            delay(2_000)
-            if (withContext(Dispatchers.IO) { open() }) { _state.update { it.copy(notice = "") }; return }
+        val r = try {
+            TermuxTool(g.termux) { true }.startFreeLlmApi(object : ToolContext { override val sessionId = "" })
+        } finally {
+            _state.update { it.copy(notice = "") }
         }
-        _state.update { it.copy(notice = "") }
-        throw IllegalStateException("Tried to start FreeLLMAPI in Termux but it didn't come up within a minute. Open Termux to see what it says.")
+        if (withContext(Dispatchers.IO) { open() }) return
+        throw IllegalStateException("FreeLLMAPI isn't running. " + r.text)
     }
 
     private fun handle(ev: AgentEvent, onFinal: (String) -> Unit) {
@@ -338,7 +336,9 @@ class AgentRunner(private val g: Graph) {
         )
         val connected = buildList<Tool> {
             if (g.connectors.emailAccounts.isNotEmpty()) add(EmailTool(g.email) { g.connectors.emailOrganize })
-            val termuxTool = if (g.connectors.termuxOn) TermuxTool(g.termux) { g.connectors.termuxOn } else null
+            // Offered whenever Termux is installed, so "start FreeLLMAPI" always reaches it; the tool
+            // itself explains any missing setup step.
+            val termuxTool = if (g.connectors.termuxOn || g.termux.isInstalled()) TermuxTool(g.termux) { true } else null
             if (g.connectors.githubToken.isNotBlank()) {
                 val gh = GitHubClient({ g.connectors.githubToken }, http = g.http)
                 add(GitHubTool(gh) { g.connectors.githubWrite })
