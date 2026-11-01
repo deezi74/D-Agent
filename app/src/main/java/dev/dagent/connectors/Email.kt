@@ -91,7 +91,26 @@ class EmailClient(private val load: () -> List<EmailAccount>) {
 
     /** Signs in and counts unread mail; used by the Test button. */
     suspend fun test(acc: EmailAccount): String = withContext(Dispatchers.IO) {
-        withFolder(acc) { _, inbox -> "Connected ${acc.user}. ${inbox.unreadMessageCount} unread of ${inbox.messageCount} in the inbox." }
+        try {
+            withFolder(acc) { _, inbox -> "Connected ${acc.user}. ${inbox.unreadMessageCount} unread of ${inbox.messageCount} in the inbox." }
+        } catch (e: Exception) {
+            throw java.io.IOException(explain(acc, e.message.orEmpty()), e)
+        }
+    }
+
+    /** Turns IMAP sign-in errors into what to actually do. */
+    fun explain(acc: EmailAccount, msg: String): String {
+        val auth = msg.contains("AUTHENTICATIONFAILED", true) || msg.contains("Invalid credentials", true) || msg.contains("authentication failed", true)
+        if (!auth) return msg
+        val gmail = acc.host.contains("gmail") || acc.user.endsWith("@gmail.com", true) || acc.user.endsWith("@googlemail.com", true)
+        return when {
+            gmail -> "Google said the password is wrong. Gmail only takes an app password (16 letters), never your normal Google password, " +
+                "and Google only offers app passwords after 2-Step Verification is on. 1) Turn on 2-Step Verification. 2) Open myaccount.google.com/apppasswords, " +
+                "make one named D-Agent, and paste the 16 letters here." + (if (acc.password.length != 16) " (What you entered is ${acc.password.length} characters, so it's probably not an app password.)" else "")
+            acc.host.contains("yahoo") || acc.host.contains("aol") -> "Wrong password. Yahoo and AOL need an app password from Account Security, not your normal password."
+            acc.host.contains("me.com") -> "Wrong password. iCloud needs an app-specific password from appleid.apple.com, not your Apple ID password."
+            else -> "Wrong email or password. Most providers need an app password for IMAP, not your normal one."
+        }
     }
 
     /** Finds a folder by IMAP special-use flag (\Trash, \All, \Archive) or by common names. */

@@ -19,6 +19,7 @@ import dev.dagent.core.places.GeoPoint
 import dev.dagent.core.tools.GitHubClient
 import dev.dagent.core.tools.GitHubTool
 import dev.dagent.core.tools.AppBuilderTool
+import dev.dagent.core.tools.WebsiteTool
 import dev.dagent.core.agent.SlimTool
 import dev.dagent.core.tools.AiCallClient
 import dev.dagent.core.tools.AiCallTool
@@ -328,6 +329,7 @@ class AgentRunner(private val g: Graph) {
             WebFetchTool(g.http),
             ImageTool(g.http, ws, { g.settings.secret(Settings.POLLINATIONS_KEY) }) { g.settings.provider("openai").apiKey to g.settings.provider("openrouter").apiKey },
             CharacterTool(g.character),
+            WebsiteTool(ws),
             MakeVideoTool(g.videos, ws),
             WeatherTool(g.places, locate),
             PlacesTool(g.places, locate),

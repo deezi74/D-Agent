@@ -88,9 +88,11 @@ object PromptBuilder {
             if ("browser" in toolNames) append("- The browser tool drives a real web browser for pages that need JavaScript, clicks, forms or a login. When a page needs the person (password, code, captcha) use action=hand_over; for orders use place_order before paying.\n")
             if ("phone" in toolNames) append("- The phone tool reaches alarms, calendar, contacts, texts, calls, apps, the clipboard, notifications, location and more.\n")
             if ("make_image" in toolNames) append("- make_image creates pictures; they show up in the chat by themselves.\n")
+            if ("make_website" in toolNames) append("- For a website, web page or app screen, write real HTML with make_website; it shows a live preview. Never draw a picture of a website.\n")
             if ("remember" in toolNames) append("- When the person shares something worth knowing next time, save it with remember without making a fuss. \"Remember that\" refers to their previous message.\n")
         } else {
             append("- This is quick chat mode: answer directly. Use web_search for anything current and cite sources. Suggest Agent mode for bigger jobs.\n")
+            if ("make_website" in toolNames) append("- For a website or web page, write real HTML with make_website (live preview), never a picture of one.\n")
         }
         if (!situation.canSeeImages) append("- The current model cannot see images. If the person sends one, say so and suggest a vision model.\n")
 

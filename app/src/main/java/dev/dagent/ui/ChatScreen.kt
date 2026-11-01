@@ -465,6 +465,7 @@ private fun FileStrip(paths: List<String>) {
     val p = LocalPalette.current
     val context = LocalContext.current
     var full by remember { mutableStateOf<String?>(null) }
+    var fullSite by remember { mutableStateOf<String?>(null) }
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         paths.forEach { path ->
             val f = File(path)
@@ -484,6 +485,14 @@ private fun FileStrip(paths: List<String>) {
                     )
                     TextButton({ shareFile(context, f) }) { Text("Share video") }
                 }
+            } else if (f.extension.lowercase() in listOf("html", "htm") && f.isFile) {
+                Column {
+                    HtmlPreview(f, Modifier.size(width = 280.dp, height = 440.dp).clip(RoundedCornerShape(16.dp)))
+                    Row {
+                        TextButton({ fullSite = path }) { Text("Full screen") }
+                        TextButton({ shareFile(context, f) }) { Text("Share") }
+                    }
+                }
             } else {
                 Row(
                     Modifier.clip(RoundedCornerShape(12.dp)).background(p.surface2).clickable { openFile(context, f) }.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -492,6 +501,18 @@ private fun FileStrip(paths: List<String>) {
                     Icon(Icons.Default.InsertDriveFile, null, tint = p.accent, modifier = Modifier.size(16.dp))
                     Text(" ${f.name}", color = p.text, fontSize = 13.sp)
                 }
+            }
+        }
+    }
+    fullSite?.let { path ->
+        Dialog({ fullSite = null }, DialogProperties(usePlatformDefaultWidth = false)) {
+            Column(Modifier.fillMaxSize().background(Color.White)) {
+                Row(Modifier.fillMaxWidth().background(p.bg).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(File(path).parentFile?.name ?: "Preview", color = p.text, fontSize = 15.sp, modifier = Modifier.weight(1f).padding(start = 8.dp))
+                    TextButton({ shareFile(context, File(path)) }) { Text("Share") }
+                    TextButton({ fullSite = null }) { Text("Close") }
+                }
+                HtmlPreview(File(path), Modifier.fillMaxSize())
             }
         }
     }
@@ -505,6 +526,27 @@ private fun FileStrip(paths: List<String>) {
             }
         }
     }
+}
+
+/** A live web page made by make_website (or any .html file), with scripts and links working. */
+@android.annotation.SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun HtmlPreview(f: File, modifier: Modifier) {
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { c ->
+            android.webkit.WebView(c).apply {
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.allowFileAccess = true
+                settings.loadWithOverviewMode = true
+                settings.useWideViewPort = true
+                webViewClient = android.webkit.WebViewClient()
+                loadUrl(android.net.Uri.fromFile(f).toString())
+            }
+        },
+        update = { it.reload() },
+        modifier = modifier,
+    )
 }
 
 fun openFile(context: android.content.Context, f: File) {

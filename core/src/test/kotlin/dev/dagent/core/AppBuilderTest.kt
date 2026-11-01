@@ -120,3 +120,16 @@ class SlimToolTest {
         assertEquals("app_builder", slim.name)
     }
 }
+
+class WebsiteToolTest {
+    @Test
+    fun writesPageAndReturnsItForPreview(): Unit = runBlocking {
+        val dir = kotlin.io.path.createTempDirectory().toFile()
+        val tool = dev.dagent.core.tools.WebsiteTool(dev.dagent.core.tools.Workspace(dir))
+        val r = tool.run(Args(buildJsonObject { put("name", JsonPrimitive("Joe's Bakery")); put("html", JsonPrimitive("```html\n<h1>Hi</h1>\n```")) }), object : ToolContext { override val sessionId = "t" })
+        val f = java.io.File(dir, "sites/joe-s-bakery/index.html")
+        assertTrue(f.readText().contains("<h1>Hi</h1>") && f.readText().contains("viewport"))
+        assertEquals(listOf(f), r.files)
+        dir.deleteRecursively()
+    }
+}

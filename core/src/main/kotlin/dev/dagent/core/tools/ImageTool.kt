@@ -43,7 +43,7 @@ class ImageTool(
     private val slow = http.newBuilder().readTimeout(180, TimeUnit.SECONDS).callTimeout(240, TimeUnit.SECONDS).build()
 
     override val name = "make_image"
-    override val description = "Create an image from a description: photos, art, logos, stickers, wallpapers, thumbnails. " +
+    override val description = "Create an image from a description: photos, art, logos, stickers, wallpapers, thumbnails (not websites or app screens; use make_website). " +
         "Write a rich prompt (subject, style, lighting, composition). To edit a photo (the person's attachment or an earlier image), " +
         "pass its /workspace path as edit and say the change in prompt (\"make it night\", \"put me in a tux\", \"remove the background\"). " +
         "The picture appears in the chat automatically; do not paste its path as a link."

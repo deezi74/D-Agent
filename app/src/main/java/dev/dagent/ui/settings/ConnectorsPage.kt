@@ -90,6 +90,7 @@ private fun CallsSection(g: Graph) {
 @Composable
 private fun EmailSection(g: Graph) {
     val p = LocalPalette.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var accounts by remember { mutableStateOf(g.connectors.emailAccounts) }
     var preset by remember { mutableStateOf(EmailClient.presets.first()) }
@@ -117,6 +118,10 @@ private fun EmailSection(g: Graph) {
             }
         }
         Muted(preset.help)
+        if (preset.id == "gmail") Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://myaccount.google.com/signinoptions/twosv"))) }) { Text("1. 2-Step Verification") }
+            OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://myaccount.google.com/apppasswords"))) }) { Text("2. App password") }
+        }
         if (preset.id == "other") OutlinedTextField(host, { host = it }, label = { Text("IMAP server") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(user, { user = it.trim() }, label = { Text("Email address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(pass, { pass = it }, label = { Text("App password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
@@ -126,7 +131,7 @@ private fun EmailSection(g: Graph) {
             scope.launch {
                 runCatching { g.email.test(acc) }
                     .onSuccess { msg -> accounts = accounts.filterNot { it.user.equals(acc.user, true) } + acc; g.connectors.emailAccounts = accounts; user = ""; pass = ""; status = msg }
-                    .onFailure { status = "Couldn't sign in: ${it.message}" }
+                    .onFailure { status = "Couldn't sign in. ${it.message}" }
             }
         }, enabled = user.contains('@') && pass.isNotBlank() && host.isNotBlank(), colors = ButtonDefaults.buttonColors(containerColor = p.accent)) { Text("Add account") }
         if (status.isNotBlank()) Muted(status)
