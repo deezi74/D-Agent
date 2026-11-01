@@ -1,0 +1,32 @@
+[
+ {
+  "id": "sparky",
+  "name": "Sparky",
+  "look": "a chubby little orange fox kit with a cream belly, a fluffy tail whose tip glows like a warm ember, tiny gold scarf"
+ },
+ {
+  "id": "bolt",
+  "name": "Bolt",
+  "look": "a small round teal robot with a dark glass visor face showing two bright cyan dot eyes, a springy antenna with a yellow ball, stubby arms"
+ },
+ {
+  "id": "pip",
+  "name": "Pip",
+  "look": "a plump cream and caramel hamster astronaut in a white space suit with an orange stripe, clear bubble helmet pushed back"
+ },
+ {
+  "id": "nimbus",
+  "name": "Nimbus",
+  "look": "a fluffy white cloud lamb with a soft lilac face, tiny curled horns, and a striped rainbow knit scarf"
+ },
+ {
+  "id": "gizmo",
+  "name": "Gizmo",
+  "look": "a little lime green frog in a shiny yellow raincoat with brass goggles on its forehead"
+ },
+ {
+  "id": "juno",
+  "name": "Juno",
+  "look": "a mint green baby sea turtle with a coral pink shell pattern, wearing small white headphones and a tiny navy backpack"
+ }
+]
