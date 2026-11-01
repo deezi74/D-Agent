@@ -158,10 +158,15 @@ class AgentRunner(private val g: Graph) {
             if (session.messages.isEmpty()) session = session.copy(title = titleFrom(text.ifBlank { "Photo" }))
             session = session.copy(messages = session.messages + user, updated = System.currentTimeMillis())
             _state.update { it.copy(session = session, running = true, error = "", notice = "", streamText = "", streamReasoning = "") }
-            AgentService.start(g.context, g.settings.current.persona.name)
+            // Quick replies don't need the keep-alive service; only start it if the run takes a while.
+            val keepAlive = scope.launch {
+                kotlinx.coroutines.delay(4_000)
+                AgentService.start(g.context, g.settings.current.persona.name)
+            }
             try {
                 runLoop()
             } finally {
+                keepAlive.cancel()
                 _state.update { it.copy(running = false, streamText = "", streamReasoning = "") }
                 g.chats.save(_state.value.session)
                 AgentService.stop(g.context)
