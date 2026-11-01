@@ -82,6 +82,9 @@ class Graph(val context: Context) {
         openAi = { settings.provider("openai").takeIf { it.apiKey.isNotBlank() }?.let { it.baseUrl to it.apiKey } },
     )
     val connectors = Connectors(context, settings)
+    val guardSettings = dev.dagent.data.GuardSettings(context)
+    val activity = dev.dagent.data.ActivityLog(context.filesDir)
+    val vault = dev.dagent.data.SecretVault(context)
     val places = PlacesClient(googleKey = { connectors.googlePlacesKey.ifBlank { null } }, http = http)
     val email = EmailClient { connectors.emailAccounts }
     val termux = TermuxBridge(context).also { bridge ->

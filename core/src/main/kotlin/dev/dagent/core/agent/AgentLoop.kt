@@ -51,12 +51,15 @@ class AgentLoop(
     private val model: String,
     private val tools: List<Tool>,
     private val options: AgentOptions = AgentOptions(),
+    /** Checks, cleans and logs every tool step; null runs tools directly. */
+    private val guard: Guard? = null,
 ) {
     private val byName = tools.associateBy { it.name }
     private var nativeTools = options.nativeTools
 
     fun run(system: String, history: List<Msg>, ctx: ToolContext): Flow<AgentEvent> = flow {
         val transcript = history.toMutableList()
+        guard?.request = history.lastOrNull { it.role == Role.USER }?.text.orEmpty()
         val seen = HashMap<String, Int>()
         var step = 0
         while (true) {
@@ -174,14 +177,26 @@ class AgentLoop(
             tool == null -> ToolResult.error("There is no tool named \"${call.name}\". Available: ${byName.keys.joinToString()}.")
             parsed == null -> ToolResult.error("The arguments were not valid JSON: ${call.arguments.take(300)}. Call the tool again with a JSON object.")
             count > options.repeatLimit -> ToolResult.error("You already made this exact call ${count - 1} times and got the same result. Try a different approach or tell the person what is blocking you.")
-            else -> try {
-                tool.run(Args(parsed), ctx)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: IllegalArgumentException) {
-                ToolResult.error("Bad arguments: ${e.message}")
-            } catch (e: Throwable) {
-                ToolResult.error("${e::class.simpleName}: ${e.message}")
+            else -> {
+                val check = guard?.before(call, parsed, title, ctx) ?: Guard.Before.Allowed(parsed, "ran")
+                when (check) {
+                    is Guard.Before.Denied -> {
+                        guard?.log(call, parsed, title, ctx.sessionId, check.verdict, false, check.message, 0)
+                        ToolResult.error(check.message)
+                    }
+                    is Guard.Before.Allowed -> {
+                        val raw = try {
+                            tool.run(Args(check.args), ctx)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: IllegalArgumentException) {
+                            ToolResult.error("Bad arguments: ${e.message}")
+                        } catch (e: Throwable) {
+                            ToolResult.error("${e::class.simpleName}: ${e.message}")
+                        }
+                        guard?.after(call, parsed, title, ctx.sessionId, check.verdict, raw, System.currentTimeMillis() - start) ?: raw
+                    }
+                }
             }
         }
         emit(AgentEvent.ToolEnd(call, result, System.currentTimeMillis() - start))

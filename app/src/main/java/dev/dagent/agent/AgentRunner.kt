@@ -39,6 +39,8 @@ import dev.dagent.core.agent.Situation
 import dev.dagent.core.agent.SkillTool
 import dev.dagent.core.agent.Tool
 import dev.dagent.core.agent.ToolContext
+import dev.dagent.core.agent.Guard
+import dev.dagent.core.agent.LlmReviewer
 import dev.dagent.core.llm.ImagePart
 import dev.dagent.core.llm.LlmClient
 import dev.dagent.core.llm.Msg
@@ -220,14 +222,14 @@ class AgentRunner(private val g: Graph) {
                 agentMode = prefs.agentMode,
                 modelName = provider.model,
             )
-            val system = PromptBuilder.build(prefs.persona, situation, g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet())
+            val system = PromptBuilder.build(prefs.persona, situation, g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) + vaultNote(tools)
             val options = AgentOptions(
                 maxSteps = if (prefs.agentMode) 40 else 6,
                 think = prefs.think,
                 contextChars = if (isLocal) (prefs.localContext * 3) else 240_000,
                 maxTokens = if (isLocal) 2048 else 8192,
             )
-            val loop = AgentLoop(client, provider.model, tools, options)
+            val loop = AgentLoop(client, provider.model, tools, options, guard(client, provider.model, isLocal, background = false))
             val ctx = object : ToolContext {
                 override val sessionId: String get() = _state.value.session.id
                 override fun progress(text: String) {
@@ -367,6 +369,26 @@ class AgentRunner(private val g: Graph) {
         )
     }
 
+    /**
+     * The guard every run goes through. The reviewer (a second look at steps that reach people or
+     * spend money) uses the same model; it's skipped for on-phone models, which are too slow for it.
+     */
+    private fun guard(client: LlmClient, model: String, isLocal: Boolean, background: Boolean) = Guard(
+        rules = { g.guardSettings.rules.value },
+        sink = g.activity,
+        secrets = g.vault,
+        reviewer = if (g.guardSettings.reviewer && !isLocal) LlmReviewer(client, model) else null,
+        background = background,
+        filterMail = g.guardSettings.mailFilter,
+    )
+
+    /** Tells the model which vault secrets exist (names only) and how to use them. */
+    private fun vaultNote(tools: List<Tool>): String {
+        val names = g.vault.names()
+        if (names.isEmpty() || tools.none { it.name == "browser" }) return ""
+        return "\n\nSecret vault: the person saved these secrets: ${names.joinToString()}. You never see the values. To type one into a web page field, use the browser tool with action type and text {{vault:NAME}} (for example {{vault:${names.first()}}}). Secrets can't be used anywhere else."
+    }
+
     /** Runs a prompt with no screen (scheduled tasks) and notifies the answer. */
     suspend fun runHeadless(prompt: String, label: String): String {
         val provider = g.settings.provider()
@@ -382,7 +404,7 @@ class AgentRunner(private val g: Graph) {
         var session = ChatSession(title = "⏰ $label", messages = listOf(Msg.user(prompt)))
         var final = ""
         val ctx = object : ToolContext { override val sessionId = session.id }
-        AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = 25)).run(system, session.messages, ctx).collect { ev ->
+        AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = 25), guard(client, provider.model, provider.id == Providers.LOCAL_ID, background = true)).run(system, session.messages, ctx).collect { ev ->
             if (ev is AgentEvent.Message) {
                 session = session.copy(messages = session.messages + ev.msg, updated = System.currentTimeMillis())
                 if (ev.msg.role == Role.ASSISTANT && ev.msg.toolCalls.isEmpty()) final = ev.msg.text
@@ -406,7 +428,7 @@ class AgentRunner(private val g: Graph) {
         val system = PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = false, agentMode = false), g.memory.forPrompt(), emptyList(), tools.map { it.name }.toSet())
         var final = ""
         val ctx = object : ToolContext { override val sessionId = "once" }
-        AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = maxSteps)).run(system, listOf(Msg.user(prompt)), ctx).collect { ev ->
+        AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = maxSteps), guard(client, provider.model, provider.id == Providers.LOCAL_ID, background = true)).run(system, listOf(Msg.user(prompt)), ctx).collect { ev ->
             if (ev is AgentEvent.Message && ev.msg.role == Role.ASSISTANT && ev.msg.toolCalls.isEmpty()) final = ev.msg.text
         }
         return final
@@ -435,7 +457,7 @@ class AgentRunner(private val g: Graph) {
         var final = ""
         val files = ArrayList<File>()
         val ctx = object : ToolContext { override val sessionId = session.id }
-        AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = 25)).run(system, session.messages, ctx).collect { ev ->
+        AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = 25), guard(client, provider.model, provider.id == Providers.LOCAL_ID, background = !g.interactions.uiVisible)).run(system, session.messages, ctx).collect { ev ->
             when (ev) {
                 is AgentEvent.Message -> {
                     session = session.copy(messages = session.messages + ev.msg, updated = System.currentTimeMillis())

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,6 +33,9 @@ fun SettingsHost(g: Graph, page: String, open: (String) -> Unit, back: () -> Uni
         "voice" -> VoicePage(g, back)
         "connectors" -> ConnectorsPage(g, back)
         "tasks" -> TasksPage(g, back)
+        "guard" -> GuardPage(g, open, back)
+        "activity" -> ActivityPage(g, back)
+        "vault" -> VaultPage(g, back)
         "about" -> AboutPage(back)
         else -> Home(g, open, back)
     }
@@ -54,6 +58,7 @@ private fun Home(g: Graph, open: (String) -> Unit, back: () -> Unit) {
             is LinuxComputer.State.Failed -> "Install failed"
             LinuxComputer.State.NotInstalled -> "Not installed"
         }) { open("linux") }
+        NavRow(Icons.Default.Shield, "Guard and activity", "Rules, second look, secret vault, activity log") { open("guard") }
         NavRow(Icons.Default.Memory, "Memory", "What ${prefs.persona.name} knows about you") { open("memory") }
         NavRow(Icons.Default.Psychology, "Skills", "Know-how the agent reads before tasks") { open("skills") }
         NavRow(Icons.Default.Alarm, "Scheduled tasks", "Things set to run later") { open("tasks") }

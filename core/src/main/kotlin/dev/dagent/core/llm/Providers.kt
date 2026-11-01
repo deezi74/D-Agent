@@ -75,10 +75,18 @@ object Providers {
             keyRequired = false, blurb = "An Ollama server on this phone (Termux) or your network.",
         ),
         ProviderPreset(
+            "lmstudio", "LM Studio (PC)", ApiKind.OPENAI, "http://192.168.1.100:1234/v1", "",
+            keyRequired = false,
+            blurb = "Models running on your computer in LM Studio. In LM Studio's Developer tab start the server with 'Serve on local network' on, then put your PC's address here (ipconfig shows it). Use the model name LM Studio lists.",
+        ),
+        ProviderPreset(
             "custom", "Custom (OpenAI-compatible)", ApiKind.OPENAI, "http://localhost:8080/v1", "",
             keyRequired = false, blurb = "Any server that speaks the OpenAI chat completions API.",
         ),
     )
+
+    /** Private network addresses: home Wi-Fi (192.168.x, 10.x, 172.16-31.x) and Tailscale (100.64-127.x). */
+    private val LAN = Regex("://(192\\.168\\.|10\\.|172\\.(1[6-9]|2\\d|3[01])\\.|100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.)")
 
     fun preset(id: String): ProviderPreset? = presets.firstOrNull { it.id == id }
 
@@ -93,7 +101,9 @@ object Providers {
         // A cloud model that goes quiet for 90 s is stuck; fail and retry instead of spinning for
         // minutes. The phone's own model gets longer, since reading a big prompt on the CPU is slow.
         val onPhone = baseUrl.contains("127.0.0.1:$LOCAL_PORT")
-        val h = http.newBuilder().readTimeout(if (onPhone) 600L else 90L, java.util.concurrent.TimeUnit.SECONDS).build()
+        // A computer on the home network (LM Studio, Ollama) may load a big model first.
+        val lan = LAN.containsMatchIn(baseUrl)
+        val h = http.newBuilder().readTimeout(if (onPhone) 600L else if (lan) 300L else 90L, java.util.concurrent.TimeUnit.SECONDS).build()
         return when (kind) {
             ApiKind.OPENAI -> OpenAiClient(h, baseUrl, apiKey, headers, reasoning)
             ApiKind.ANTHROPIC -> AnthropicClient(h, baseUrl, apiKey)
@@ -112,6 +122,8 @@ object Providers {
             local && (m.contains("failed to connect") || m.contains("refused")) ->
                 if (baseUrl.contains(":3001")) "FreeLLMAPI isn't running. Start it in Termux: cd ~/freellmapi && termux-wake-lock && npm run dev (or turn on the Termux connector and D-Agent starts it for you)."
                 else "Nothing is answering at $baseUrl. Start that server, or pick another provider."
+            LAN.containsMatchIn(baseUrl) && (m.contains("failed to connect") || m.contains("refused") || m.contains("unreachable") || m.contains("no route")) ->
+                "Can't reach the computer at $baseUrl. Check that LM Studio's server (or Ollama) is running with network access on, the phone is on the same Wi-Fi (or Tailscale), and Windows Firewall allows the port."
             m.contains("unable to resolve host") || m.contains("no address") -> "No internet connection right now."
             else -> message
         }
