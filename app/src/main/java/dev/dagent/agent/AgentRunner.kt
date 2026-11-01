@@ -267,7 +267,7 @@ class AgentRunner(private val g: Graph) {
         val quick = listOf<Tool>(
             WebSearchTool(g.search),
             WebFetchTool(g.http),
-            ImageTool(g.http, ws) { g.settings.secret(Settings.POLLINATIONS_KEY) },
+            ImageTool(g.http, ws, { g.settings.secret(Settings.POLLINATIONS_KEY) }) { g.settings.provider("openai").apiKey to g.settings.provider("openrouter").apiKey },
             CharacterTool(g.character),
             RememberTool(g.memory),
             RecallTool(g.memory),
