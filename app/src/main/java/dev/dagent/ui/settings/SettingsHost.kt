@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -28,6 +29,7 @@ fun SettingsHost(g: Graph, page: String, open: (String) -> Unit, back: () -> Uni
         "memory" -> MemoryPage(g, back)
         "skills" -> SkillsPage(g, back)
         "tools" -> ToolsPage(g, back)
+        "voice" -> VoicePage(g, back)
         "connectors" -> ConnectorsPage(g, back)
         "tasks" -> TasksPage(g, back)
         "about" -> AboutPage(back)
@@ -43,6 +45,7 @@ private fun Home(g: Graph, open: (String) -> Unit, back: () -> Unit) {
     Page("Settings", back) {
         NavRow(Icons.Default.Face, "${prefs.persona.name}: look and personality", "Name, character, picture, colors, about you") { open("persona") }
         NavRow(Icons.Default.Cloud, "AI providers", "${provider.preset.name} · ${provider.model}") { open("providers") }
+        NavRow(Icons.Default.RecordVoiceOver, "Voice", if (prefs.voiceProvider == "phone") "Phone voice · set up a free natural voice" else "Natural voice · ${prefs.voiceName}") { open("voice") }
         NavRow(Icons.Default.Hub, "Connectors", "Email, GitHub, Telegram, Termux, weather and places") { open("connectors") }
         NavRow(Icons.Default.PhoneAndroid, "On-phone models", "Offline AI with GGUF models") { open("local") }
         NavRow(Icons.Default.Terminal, "Linux computer", when (linux) {

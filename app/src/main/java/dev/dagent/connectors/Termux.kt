@@ -144,11 +144,11 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
     override val description =
         "Run shell commands in the person's own Termux app (separate from your built-in Linux computer; use this for things set up there, like FreeLLMAPI). " +
             "run: a short command (2 min max). start: a long command in the background, returns a job id; job: show a job's log and exit code. " +
-            "write: write a text file under the Termux home. freellmapi: start the FreeLLMAPI server (~/freellmapi, npm run dev, port 3001). setup_android: install JDK, Gradle and the Android SDK (about 1 GB). " +
+            "write: write a text file under the Termux home. freellmapi: start the FreeLLMAPI server (~/freellmapi, npm run dev, port 3001). voice: install and start the free natural voice server (port 5050). setup_android: install JDK, Gradle and the Android SDK (about 1 GB). " +
             "Explain what a command does before running anything that changes files."
     override val parameters = schema {
         title()
-        string("action", "What to do (default run).", enum = listOf("run", "start", "job", "write", "freellmapi", "setup_android"))
+        string("action", "What to do (default run).", enum = listOf("run", "start", "job", "write", "freellmapi", "voice", "setup_android"))
         string("command", "run/start: the shell command.")
         string("id", "job: the job id.")
         string("path", "write: path under the Termux home.")
@@ -160,6 +160,7 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
         val arguments = args
         val action = arguments.string("action")?.lowercase(Locale.US) ?: "run"
         if (action == "freellmapi") return startFreeLlmApi(ctx)
+        if (action == "voice") return startVoiceServer(ctx)
         termux.problem()?.let { return ToolResult.error(it + SETUP_HINT) }
         return when (action) {
             "run", "exec" -> {
@@ -220,6 +221,28 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
             if (log.error != null) " (Termux also said: ${log.error}$SETUP_HINT)" else "")
     }
 
+    /**
+     * Installs (first time) and starts the free voice server in a Termux session on port 5050: a
+     * small OpenAI-style /v1/audio/speech endpoint backed by the edge-tts Python package.
+     */
+    suspend fun startVoiceServer(ctx: ToolContext): ToolResult {
+        val port = dev.dagent.phone.CloudVoice.TERMUX_PORT
+        if (termux.portOpen(port)) return ToolResult.ok("The free voice is already running. Pick it in Settings > Voice.")
+        termux.problem()?.let { return ToolResult.error(it + SETUP_HINT) }
+        ctx.progress("Setting up the free voice in Termux...")
+        val b64 = Base64.encodeToString(VOICE_SERVER_PY.toByteArray(), Base64.NO_WRAP)
+        val script = "mkdir -p ~/.dagent/voice && echo '$b64' | base64 -d > ~/.dagent/voice/server.py && " +
+            "(command -v python >/dev/null || pkg install -y python) && (python -c 'import edge_tts' 2>/dev/null || AIOHTTP_NO_EXTENSIONS=1 MULTIDICT_NO_EXTENSIONS=1 YARL_NO_EXTENSIONS=1 FROZENLIST_NO_EXTENSIONS=1 PROPCACHE_NO_EXTENSIONS=1 pip install edge-tts) && " +
+            "command -v termux-wake-lock >/dev/null && termux-wake-lock; python ~/.dagent/voice/server.py"
+        termux.openSession(script, "D-Agent voice")?.let { return ToolResult.error("Termux didn't take the command ($it$SETUP_HINT).") }
+        val deadline = System.currentTimeMillis() + 240_000
+        while (System.currentTimeMillis() < deadline) {
+            kotlinx.coroutines.delay(3_000)
+            if (termux.portOpen(port)) return ToolResult.ok("The free voice is running in Termux (session \"D-Agent voice\"). Pick \"Free natural voice\" in Settings > Voice.")
+        }
+        return ToolResult.error("The voice server didn't start within 4 minutes. Open Termux and check the \"D-Agent voice\" session for the error.")
+    }
+
     suspend fun startJob(cmd: String): ToolResult {
         val id = "job" + System.currentTimeMillis().toString(36)
         val b64 = Base64.encodeToString(cmd.toByteArray(), Base64.NO_WRAP)
@@ -276,6 +299,39 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
 
         const val FREELLMAPI_START = TermuxBridge.FREELLMAPI_COMMAND
         const val SETUP_HINT = ". One-time Termux setup: in Termux run  echo allow-external-apps=true >> ~/.termux/termux.properties && termux-reload-settings  then allow D-Agent in Settings > Connectors > Termux"
+
+        /** A tiny OpenAI-style speech server: POST /v1/audio/speech {input, voice} returns MP3. */
+        val VOICE_SERVER_PY = """
+            import asyncio, json
+            from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+            import edge_tts
+
+            async def speak(text, voice):
+                out = bytearray()
+                async for chunk in edge_tts.Communicate(text, voice).stream():
+                    if chunk["type"] == "audio":
+                        out += chunk["data"]
+                return bytes(out)
+
+            class Handler(BaseHTTPRequestHandler):
+                def do_POST(self):
+                    if not self.path.startswith("/v1/audio/speech"):
+                        self.send_error(404); return
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+                    try:
+                        audio = asyncio.run(speak(body.get("input", ""), body.get("voice") or "en-US-AvaNeural"))
+                    except Exception as e:
+                        msg = json.dumps({"error": {"message": str(e)}}).encode()
+                        self.send_response(500); self.send_header("Content-Type", "application/json"); self.end_headers(); self.wfile.write(msg); return
+                    self.send_response(200); self.send_header("Content-Type", "audio/mpeg"); self.send_header("Content-Length", str(len(audio))); self.end_headers()
+                    self.wfile.write(audio)
+                def do_GET(self):
+                    self.send_response(200); self.end_headers(); self.wfile.write(b"D-Agent voice is running")
+                def log_message(self, *a): pass
+
+            print("D-Agent voice running on http://127.0.0.1:5050 (leave this open)")
+            ThreadingHTTPServer(("127.0.0.1", 5050), Handler).serve_forever()
+        """.trimIndent()
 
         /** Starts FreeLLMAPI in Termux the way the person runs it: ~/freellmapi, wake lock, npm run dev. */
         val FREELLMAPI_SCRIPT = """

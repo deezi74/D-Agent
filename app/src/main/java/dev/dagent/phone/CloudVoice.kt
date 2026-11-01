@@ -34,6 +34,7 @@ class CloudVoice(private val settings: Settings, private val cacheDir: File, htt
     /** Every voice service, with whether its key is set. */
     fun options(): List<Pair<Option, Boolean>> = listOf(
         Option(PHONE, "Phone voice", emptyList()) to true,
+        Option(TERMUX, "Free natural voice (runs in Termux)", TERMUX_VOICES) to true,
         Option(OPENAI, "OpenAI", OPENAI_VOICES) to key(OPENAI).isNotBlank(),
         Option(OPENROUTER, "OpenRouter", OPENAI_VOICES) to key(OPENROUTER).isNotBlank(),
         Option(ELEVENLABS, "ElevenLabs", ELEVEN_VOICES) to key(ELEVENLABS).isNotBlank(),
@@ -42,7 +43,7 @@ class CloudVoice(private val settings: Settings, private val cacheDir: File, htt
     /** True when a cloud voice is picked and its key is present. */
     fun active(): Boolean {
         val p = settings.current.voiceProvider
-        return p != PHONE && key(p).isNotBlank()
+        return p == TERMUX || p != PHONE && key(p).isNotBlank()
     }
 
     suspend fun synthesize(text: String): File = withContext(Dispatchers.IO) {
@@ -51,6 +52,13 @@ class CloudVoice(private val settings: Settings, private val cacheDir: File, htt
         dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 10 * 60_000 }?.forEach { it.delete() }
         val out = File(dir, "say_${System.nanoTime()}.mp3")
         val request = when (s.voiceProvider) {
+            TERMUX -> Request.Builder()
+                .url("http://127.0.0.1:$TERMUX_PORT/v1/audio/speech")
+                .post(buildJsonObject {
+                    put("input", text)
+                    put("voice", s.voiceName.takeIf { v -> TERMUX_VOICES.any { it.first == v } } ?: TERMUX_VOICES.first().first)
+                }.toString().toRequestBody(JSON))
+                .build()
             ELEVENLABS -> {
                 val voice = s.voiceName.takeIf { v -> ELEVEN_VOICES.any { it.first == v } || (v.length > 15 && OPENAI_VOICES.none { it.first == v }) }
                     ?: ELEVEN_VOICES.first().first
@@ -74,7 +82,10 @@ class CloudVoice(private val settings: Settings, private val cacheDir: File, htt
                 .post(openAiBody("gpt-4o-mini-tts", text, s.voiceName).toString().toRequestBody(JSON))
                 .build()
         }
-        http.newCall(request).execute().use { resp ->
+        try { http.newCall(request).execute() } catch (e: java.net.ConnectException) {
+            if (s.voiceProvider == TERMUX) throw IOException("The Termux voice isn't running. Start it in Settings > Voice (or ask: start the free voice).")
+            throw e
+        }.use { resp ->
             if (!resp.isSuccessful) {
                 val body = resp.body?.string().orEmpty()
                 val msg = runCatching {
@@ -103,6 +114,15 @@ class CloudVoice(private val settings: Settings, private val cacheDir: File, htt
         const val OPENAI = "openai"
         const val OPENROUTER = "openrouter"
         const val ELEVENLABS = "elevenlabs"
+        const val TERMUX = "termux"
+        const val TERMUX_PORT = 5050
+
+        /** Natural neural voices the Termux voice server offers (American English first). */
+        val TERMUX_VOICES = listOf(
+            "en-US-AvaNeural" to "Ava", "en-US-AndrewNeural" to "Andrew", "en-US-EmmaNeural" to "Emma", "en-US-BrianNeural" to "Brian",
+            "en-US-JennyNeural" to "Jenny", "en-US-GuyNeural" to "Guy", "en-US-AriaNeural" to "Aria", "en-US-ChristopherNeural" to "Christopher",
+            "en-GB-SoniaNeural" to "Sonia (UK)", "en-GB-RyanNeural" to "Ryan (UK)",
+        )
         private val JSON = "application/json".toMediaType()
 
         val OPENAI_VOICES = listOf(

@@ -611,11 +611,9 @@ fun ToolsPage(g: Graph, back: () -> Unit) {
     val prefs by g.settings.state.collectAsState()
     var searx by remember { mutableStateOf(prefs.searxUrl) }
     var pollen by remember { mutableStateOf(g.settings.secret(Settings.POLLINATIONS_KEY)) }
-    var eleven by remember { mutableStateOf(g.settings.secret(Settings.ELEVENLABS_KEY)) }
     fun saveAll() {
         g.settings.update { it.copy(searxUrl = searx) }
         g.settings.setSecret(Settings.POLLINATIONS_KEY, pollen)
-        g.settings.setSecret(Settings.ELEVENLABS_KEY, eleven)
     }
     Page("Tools and behavior", { saveAll(); back() }) {
         Card {
@@ -624,25 +622,7 @@ fun ToolsPage(g: Graph, back: () -> Unit) {
             ToggleRow("Think before answering", "Slower, better on hard questions (models that support it)", prefs.think) { v -> g.settings.update { it.copy(think = v) } }
         }
         Section("Voice")
-        Card {
-            Muted("The voice used for read-aloud and voice mode. Natural voices use your own OpenAI or OpenRouter key (set in AI providers) or an ElevenLabs key; without one it uses the phone's voice.")
-            g.cloudVoice.options().forEach { (opt, ready) ->
-                Row(Modifier.fillMaxWidth().clickable(enabled = ready) { g.settings.update { it.copy(voiceProvider = opt.id, voiceName = opt.voices.firstOrNull()?.first ?: it.voiceName) } }, verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(prefs.voiceProvider == opt.id, { g.settings.update { it.copy(voiceProvider = opt.id, voiceName = opt.voices.firstOrNull()?.first ?: it.voiceName) } }, enabled = ready)
-                    Text(opt.label + if (ready) "" else " (add a key)", color = if (ready) p.text else p.muted)
-                }
-            }
-            val voices = g.cloudVoice.options().firstOrNull { it.first.id == prefs.voiceProvider }?.first?.voices.orEmpty()
-            if (voices.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                voices.forEach { (id, label) ->
-                    val on = prefs.voiceName == id
-                    Text(label, color = if (on) Color(0xFF1A0E08) else p.text, fontSize = 13.sp,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) p.accent else p.bg).clickable { g.settings.update { it.copy(voiceName = id) } }.padding(horizontal = 12.dp, vertical = 7.dp))
-                }
-            }
-            OutlinedTextField(eleven, { eleven = it }, label = { Text("ElevenLabs key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-            OutlinedButton({ g.settings.setSecret(Settings.ELEVENLABS_KEY, eleven); g.speaker.say("Hey, it's ${prefs.persona.name}. This is how I sound.") }) { Text("Test the voice") }
-        }
+        Card { Muted("Voice settings have their own page now: Settings > Voice.") }
         Section("Calls and texts")
         Card {
             Muted("${prefs.persona.name} places calls and sends texts itself (after asking, if that's on). Pick which SIM it uses; you can also say \"call Mom on SIM 2\".")
@@ -710,5 +690,51 @@ fun AboutPage(back: () -> Unit) {
         Muted("A personal AI agent for your phone, by deezi74. No account and no tracking: chats, memory and keys stay on this phone and go only to the AI provider you pick.")
         Section("Built with")
         Muted("Kotlin and Jetpack Compose. PRoot (GPL-2.0) and Alpine Linux run as separate programs for the Linux computer. llama.cpp (MIT) runs on-phone models. OkHttp, jsoup, Coil and kotlinx libraries (Apache-2.0 / MIT).")
+    }
+}
+
+
+// ---- Voice --------------------------------------------------------------------------------------
+
+@Composable
+fun VoicePage(g: Graph, back: () -> Unit) {
+    val p = LocalPalette.current
+    val prefs by g.settings.state.collectAsState()
+    val scope = rememberCoroutineScope()
+    var eleven by remember { mutableStateOf(g.settings.secret(Settings.ELEVENLABS_KEY)) }
+    var status by remember { mutableStateOf("") }
+    Page("Voice", { g.settings.setSecret(Settings.ELEVENLABS_KEY, eleven); back() }) {
+        Card {
+            Muted("The free natural voice runs in your Termux app at no cost and with no key (it uses Microsoft Edge's online voices, so it needs internet). Tap below once; it installs and starts it.")
+            Button({
+                status = "Setting up the free voice in Termux (first time takes a minute or two)..."
+                scope.launch {
+                    val r = dev.dagent.connectors.TermuxTool(g.termux) { true }.startVoiceServer(object : dev.dagent.core.agent.ToolContext { override val sessionId = "" })
+                    status = r.text
+                    if (!r.isError) g.settings.update { it.copy(voiceProvider = dev.dagent.phone.CloudVoice.TERMUX, voiceName = dev.dagent.phone.CloudVoice.TERMUX_VOICES.first().first) }
+                }
+            }, colors = ButtonDefaults.buttonColors(containerColor = p.accent)) { Text("Set up free voice in Termux") }
+            if (status.isNotBlank()) Muted(status)
+        }
+        Section("Voice")
+        Card {
+            Muted("The voice used for read-aloud and voice mode. Natural voices use your own OpenAI or OpenRouter key (set in AI providers) or an ElevenLabs key; without one it uses the phone's voice.")
+            g.cloudVoice.options().forEach { (opt, ready) ->
+                Row(Modifier.fillMaxWidth().clickable(enabled = ready) { g.settings.update { it.copy(voiceProvider = opt.id, voiceName = opt.voices.firstOrNull()?.first ?: it.voiceName) } }, verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(prefs.voiceProvider == opt.id, { g.settings.update { it.copy(voiceProvider = opt.id, voiceName = opt.voices.firstOrNull()?.first ?: it.voiceName) } }, enabled = ready)
+                    Text(opt.label + if (ready) "" else " (add a key)", color = if (ready) p.text else p.muted)
+                }
+            }
+            val voices = g.cloudVoice.options().firstOrNull { it.first.id == prefs.voiceProvider }?.first?.voices.orEmpty()
+            if (voices.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                voices.forEach { (id, label) ->
+                    val on = prefs.voiceName == id
+                    Text(label, color = if (on) Color(0xFF1A0E08) else p.text, fontSize = 13.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) p.accent else p.bg).clickable { g.settings.update { it.copy(voiceName = id) } }.padding(horizontal = 12.dp, vertical = 7.dp))
+                }
+            }
+            OutlinedTextField(eleven, { eleven = it }, label = { Text("ElevenLabs key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+            OutlinedButton({ g.settings.setSecret(Settings.ELEVENLABS_KEY, eleven); g.speaker.say("Hey, it's ${prefs.persona.name}. This is how I sound.") }) { Text("Test the voice") }
+        }
     }
 }
