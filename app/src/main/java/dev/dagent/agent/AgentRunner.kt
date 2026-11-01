@@ -350,6 +350,11 @@ class AgentRunner(private val g: Graph) {
                 ))
             }
             if (termuxTool != null) add(termuxTool)
+            if (g.connectors.pcUrl.isNotBlank() && g.connectors.pcCode.isNotBlank()) {
+                add(dev.dagent.core.tools.PcTool(dev.dagent.connectors.PcWatch.client(g), g.workspace) { id, title ->
+                    dev.dagent.connectors.PcWatch.add(g.context, g, id, title)
+                })
+            }
             if (g.connectors.aiCallKey.isNotBlank()) add(AiCallTool(AiCallClient({ g.connectors.aiCallKey }, http = g.http)) { g.connectors.ownerName() })
         }
         if (!agentMode) return quick + connected

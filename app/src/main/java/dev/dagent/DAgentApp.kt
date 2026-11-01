@@ -49,6 +49,7 @@ class DAgentApp : Application() {
         PhoneActions.ensureChannel(this)
         BuiltinSkills.install(this, graph.skills)
         if (graph.telegram.enabled) runCatching { graph.telegram.start() }
+        if (graph.connectors.pcWatched.isNotEmpty()) runCatching { dev.dagent.connectors.PcWatch.schedule(this) }
     }
 }
 

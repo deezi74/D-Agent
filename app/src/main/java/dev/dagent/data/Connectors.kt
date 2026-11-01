@@ -32,6 +32,20 @@ class Connectors(context: Context, private val settings: Settings) {
         set(v) = settings.setSecret("github", v)
 
     /** Bland AI key for calls where the AI talks. */
+    /** Your PC: D-Agent PC's address and pairing code. */
+    var pcUrl: String
+        get() = prefs.getString("pc.url", "")!!
+        set(v) { prefs.edit().putString("pc.url", v.trim()).apply() }
+
+    var pcCode: String
+        get() = settings.secret("pc_code")
+        set(v) = settings.setSecret("pc_code", v.trim())
+
+    /** PC tasks to report when they finish, as "id|title". */
+    var pcWatched: Set<String>
+        get() = prefs.getStringSet("pc.watched", emptySet())!!.toSet()
+        set(v) { prefs.edit().putStringSet("pc.watched", v).apply() }
+
     var aiCallKey: String
         get() = settings.secret("ai_call")
         set(v) = settings.setSecret("ai_call", v)

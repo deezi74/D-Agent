@@ -50,6 +50,7 @@ fun ConnectorsPage(g: Graph, back: () -> Unit) {
     Page("Connectors", back) {
         Muted("Connect your own accounts. Keys stay encrypted on this phone, and nothing here needs a D-Agent account.")
         DetailsSection(g)
+        PcSection(g)
         CallsSection(g)
         EmailSection(g)
         GitHubSection(g)
@@ -72,6 +73,71 @@ private fun DetailsSection(g: Graph) {
         OutlinedTextField(phone, { phone = it; g.connectors.myPhone = it }, label = { Text("Phone") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(email, { email = it; g.connectors.myEmail = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(address, { address = it; g.connectors.myAddress = it }, label = { Text("Delivery address") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+private const val PC_INSTALL_WINDOWS = "irm https://raw.githubusercontent.com/deezi74/D-Agent/claude/project-thread-7jgi6v/pc-worker/install.ps1 | iex"
+private const val PC_INSTALL_LINUX = "curl -fsSL https://raw.githubusercontent.com/deezi74/D-Agent/claude/project-thread-7jgi6v/pc-worker/install.sh | bash"
+
+@Composable
+private fun PcSection(g: Graph) {
+    val p = LocalPalette.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var url by remember { mutableStateOf(g.connectors.pcUrl) }
+    var code by remember { mutableStateOf(g.connectors.pcCode) }
+    var status by remember { mutableStateOf("") }
+    var models by remember { mutableStateOf<List<String>>(emptyList()) }
+    var model by remember { mutableStateOf("") }
+    fun copy(text: String, what: String) {
+        val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+        cm.setPrimaryClip(android.content.ClipData.newPlainText(what, text))
+        status = "Copied the $what command. Paste it on the computer."
+    }
+    Section("Your PC (always-on computer)")
+    Card {
+        Muted("Turn your computer into ${g.settings.current.persona.name}'s always-on computer. Big jobs (research, coding, downloads) run there with your PC's AI model, keep going while the phone sleeps, and you get a notification when they're done. Ask things like \"on my PC, research the best 65-inch TVs and save a report\".")
+        Text("1. On the computer, install D-Agent PC:", color = p.text, fontSize = 14.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton({ copy(PC_INSTALL_WINDOWS, "Windows (PowerShell)") }) { Text("Copy Windows command") }
+            OutlinedButton({ copy(PC_INSTALL_LINUX, "Linux/Mac") }) { Text("Linux/Mac") }
+        }
+        Muted("Send the command to your PC (email or a notes app), paste it into PowerShell, and press Enter. It prints an address and a pairing code.")
+        Text("2. Enter what it shows:", color = p.text, fontSize = 14.sp)
+        OutlinedTextField(url, { url = it; g.connectors.pcUrl = it }, label = { Text("Address (e.g. 192.168.1.20)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(code, { code = it; g.connectors.pcCode = it }, label = { Text("Pairing code") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button({
+                status = "Checking..."
+                scope.launch {
+                    status = runCatching {
+                        val h = dev.dagent.connectors.PcWatch.client(g).health()
+                        fun s(o: kotlinx.serialization.json.JsonObject?, k: String) = (o?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+                        val llm = h["llm"] as? kotlinx.serialization.json.JsonObject
+                        models = (llm?.get("models") as? kotlinx.serialization.json.JsonArray)?.map { (it as kotlinx.serialization.json.JsonPrimitive).content }.orEmpty()
+                        model = s(llm, "model")
+                        val problem = s(llm, "problem")
+                        "Connected to ${s(h, "name")} (${s(h, "os")}). " +
+                            if (problem.isNotBlank()) "But its AI isn't answering: $problem" else "AI model: ${model.ifBlank { "none loaded yet" }}."
+                    }.getOrElse { it.message ?: "Couldn't connect." }
+                }
+            }) { Text("Test") }
+        }
+        if (models.isNotEmpty()) {
+            Text("Model the PC uses for tasks:", color = p.text, fontSize = 14.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                models.forEach { m ->
+                    val on = m == model
+                    Text(m, color = if (on) Color(0xFF1A0E08) else p.text, fontSize = 13.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) p.accent else p.bg).clickable {
+                            model = m
+                            scope.launch { status = runCatching { dev.dagent.connectors.PcWatch.client(g).setModel(null, m, null); "The PC will use $m." }.getOrElse { it.message.orEmpty() } }
+                        }.padding(horizontal = 12.dp, vertical = 6.dp))
+                }
+            }
+        }
+        if (status.isNotBlank()) Muted(status)
+        Muted("Away from home? Install Tailscale on the PC and the phone and use the PC's Tailscale address. Never open port 8787 on your router.")
     }
 }
 

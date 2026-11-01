@@ -45,6 +45,7 @@ private val GUARDED_TOOLS = listOf(
     "email" to "Email",
     "github" to "GitHub",
     "app_builder" to "App builder",
+    "pc" to "Your PC (tasks and commands)",
     "shell" to "Linux computer commands",
     "termux" to "Termux commands",
     "file_write" to "Writing files",
