@@ -589,11 +589,37 @@ fun ToolsPage(g: Graph, back: () -> Unit) {
     val prefs by g.settings.state.collectAsState()
     var searx by remember { mutableStateOf(prefs.searxUrl) }
     var pollen by remember { mutableStateOf(g.settings.secret(Settings.POLLINATIONS_KEY)) }
-    Page("Tools and behavior", { g.settings.update { it.copy(searxUrl = searx) }; g.settings.setSecret(Settings.POLLINATIONS_KEY, pollen); back() }) {
+    var eleven by remember { mutableStateOf(g.settings.secret(Settings.ELEVENLABS_KEY)) }
+    fun saveAll() {
+        g.settings.update { it.copy(searxUrl = searx) }
+        g.settings.setSecret(Settings.POLLINATIONS_KEY, pollen)
+        g.settings.setSecret(Settings.ELEVENLABS_KEY, eleven)
+    }
+    Page("Tools and behavior", { saveAll(); back() }) {
         Card {
-            ToggleRow("Read replies aloud", "Speak every answer with the phone's voice", prefs.readAloud) { v -> g.settings.update { it.copy(readAloud = v) } }
+            ToggleRow("Read replies aloud", "Speak every answer out loud", prefs.readAloud) { v -> g.settings.update { it.copy(readAloud = v) } }
             ToggleRow("Ask before texts, calls and calendar changes", "Recommended", prefs.confirmRisky) { v -> g.settings.update { it.copy(confirmRisky = v) } }
             ToggleRow("Think before answering", "Slower, better on hard questions (models that support it)", prefs.think) { v -> g.settings.update { it.copy(think = v) } }
+        }
+        Section("Voice")
+        Card {
+            Muted("The voice used for read-aloud and voice mode. Natural voices use your own OpenAI or OpenRouter key (set in AI providers) or an ElevenLabs key; without one it uses the phone's voice.")
+            g.cloudVoice.options().forEach { (opt, ready) ->
+                Row(Modifier.fillMaxWidth().clickable(enabled = ready) { g.settings.update { it.copy(voiceProvider = opt.id, voiceName = opt.voices.firstOrNull()?.first ?: it.voiceName) } }, verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(prefs.voiceProvider == opt.id, { g.settings.update { it.copy(voiceProvider = opt.id, voiceName = opt.voices.firstOrNull()?.first ?: it.voiceName) } }, enabled = ready)
+                    Text(opt.label + if (ready) "" else " (add a key)", color = if (ready) p.text else p.muted)
+                }
+            }
+            val voices = g.cloudVoice.options().firstOrNull { it.first.id == prefs.voiceProvider }?.first?.voices.orEmpty()
+            if (voices.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                voices.forEach { (id, label) ->
+                    val on = prefs.voiceName == id
+                    Text(label, color = if (on) Color(0xFF1A0E08) else p.text, fontSize = 13.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) p.accent else p.bg).clickable { g.settings.update { it.copy(voiceName = id) } }.padding(horizontal = 12.dp, vertical = 7.dp))
+                }
+            }
+            OutlinedTextField(eleven, { eleven = it }, label = { Text("ElevenLabs key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+            OutlinedButton({ g.settings.setSecret(Settings.ELEVENLABS_KEY, eleven); g.speaker.say("Hey, it's ${prefs.persona.name}. This is how I sound.") }) { Text("Test the voice") }
         }
         Section("Calls and texts")
         Card {
@@ -620,7 +646,7 @@ fun ToolsPage(g: Graph, back: () -> Unit) {
         Section("Images")
         Muted("Pictures come from Pollinations. It works without a key; a free key from enter.pollinations.ai lifts the limits.")
         OutlinedTextField(pollen, { pollen = it }, label = { Text("Pollinations key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-        Button({ g.settings.update { it.copy(searxUrl = searx) }; g.settings.setSecret(Settings.POLLINATIONS_KEY, pollen); back() }, colors = ButtonDefaults.buttonColors(containerColor = p.accent)) { Text("Save") }
+        Button({ saveAll(); back() }, colors = ButtonDefaults.buttonColors(containerColor = p.accent)) { Text("Save") }
     }
 }
 

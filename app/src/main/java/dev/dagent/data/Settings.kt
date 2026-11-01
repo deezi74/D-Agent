@@ -40,6 +40,8 @@ data class AppPrefs(
     val localThreads: Int = 0,
     val onboarded: Boolean = false,
     val defaultSim: Int = 0, // 0 phone default, 1 or 2
+    val voiceProvider: String = "phone",
+    val voiceName: String = "coral",
 )
 
 /** Plain preferences in one file; API keys in an encrypted one. */
@@ -84,6 +86,8 @@ class Settings(context: Context) {
         localThreads = prefs.getInt("local.threads", 0),
         onboarded = prefs.getBoolean("onboarded", false),
         defaultSim = prefs.getInt("sim", 0),
+        voiceProvider = prefs.getString("voice.provider", "phone")!!,
+        voiceName = prefs.getString("voice.name", "coral")!!,
     )
 
     fun update(block: (AppPrefs) -> AppPrefs) {
@@ -108,6 +112,8 @@ class Settings(context: Context) {
             .putInt("local.threads", n.localThreads)
             .putBoolean("onboarded", n.onboarded)
             .putInt("sim", n.defaultSim)
+            .putString("voice.provider", n.voiceProvider)
+            .putString("voice.name", n.voiceName)
             .apply()
         _state.value = n
     }

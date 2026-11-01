@@ -41,6 +41,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
@@ -122,7 +123,7 @@ private val IMAGE_EXT = setOf("png", "jpg", "jpeg", "webp", "gif")
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings: (String) -> Unit) {
+fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings: (String) -> Unit, openVoice: () -> Unit = {}) {
     val p = LocalPalette.current
     val state by g.runner.state.collectAsState()
     val prefs by g.settings.state.collectAsState()
@@ -181,6 +182,7 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
                     )
                 }
                 ModeSwitch(prefs.agentMode) { on -> g.settings.update { it.copy(agentMode = on) } }
+                IconButton(openVoice) { Icon(Icons.Default.GraphicEq, "Voice mode", tint = p.accent) }
                 IconButton({ g.runner.newChat() }) { Icon(Icons.Default.Edit, "New chat", tint = p.text) }
             }
 

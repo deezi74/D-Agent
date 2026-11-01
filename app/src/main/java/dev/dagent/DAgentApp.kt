@@ -16,6 +16,7 @@ import dev.dagent.linux.PhoneBridge
 import dev.dagent.local.LocalModels
 import dev.dagent.phone.Interactions
 import dev.dagent.phone.PhoneActions
+import dev.dagent.phone.CloudVoice
 import dev.dagent.phone.Speaker
 import dev.dagent.schedule.Scheduler
 import okhttp3.OkHttpClient
@@ -49,7 +50,8 @@ class Graph(val context: Context) {
     val memory = MemoryStore(File(context.filesDir, "memory"))
     val skills = SkillLibrary(File(context.filesDir, "skills"))
     val interactions = Interactions(context)
-    val speaker by lazy { Speaker(context) }
+    val cloudVoice = CloudVoice(settings, context.cacheDir, http)
+    val speaker by lazy { Speaker(context, cloudVoice) }
     val phone = PhoneActions(context, interactions, { settings.current.confirmRisky }, { speaker.say(it) }, { settings.current.defaultSim })
     val bridge = PhoneBridge { action, args -> phone.run(action, args) }.also { it.start() }
     val linux = LinuxComputer(context, workspace.root, skills.dir, bridge, http).also { if (it.installed) it.configure() }

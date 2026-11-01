@@ -18,6 +18,7 @@ import dev.dagent.ui.settings.SettingsHost
 sealed interface Screen {
     data object Chat : Screen
     data class Settings(val page: String = "home") : Screen
+    data object Voice : Screen
 }
 
 @Composable
@@ -37,7 +38,8 @@ fun AppRoot(g: Graph, shared: MutableState<Pair<String, Uri?>?>) {
     }
 
     when (val top = stack.last()) {
-        Screen.Chat -> ChatScreen(g, shared, openSettings = { go(Screen.Settings(it)) })
+        Screen.Chat -> ChatScreen(g, shared, openSettings = { go(Screen.Settings(it)) }, openVoice = { go(Screen.Voice) })
+        Screen.Voice -> VoiceMode(g) { back() }
         is Screen.Settings -> SettingsHost(g, top.page, open = { go(Screen.Settings(it)) }, back = { back() })
     }
 
