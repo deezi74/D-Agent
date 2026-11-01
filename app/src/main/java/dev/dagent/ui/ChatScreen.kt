@@ -40,7 +40,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
@@ -608,7 +608,7 @@ private fun Composer(
                             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US"))
                     }.onFailure { Toast.makeText(context, "No speech recognizer on this phone", Toast.LENGTH_SHORT).show() }
                 }) { Icon(Icons.Default.Mic, "Talk", tint = p.text) }
-                else -> RoundButton(Icons.AutoMirrored.Filled.ArrowUpward, Color(0xFF1A0E08), p.accent, "Send", onSend)
+                else -> RoundButton(Icons.Default.ArrowUpward, Color(0xFF1A0E08), p.accent, "Send", onSend)
             }
         }
     }

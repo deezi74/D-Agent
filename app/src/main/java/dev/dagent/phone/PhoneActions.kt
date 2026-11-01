@@ -405,7 +405,7 @@ class PhoneActions(
         val stat = android.os.StatFs(context.filesDir.absolutePath)
         return "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), " +
             "RAM ${"%.1f".format(mem.totalMem / 1e9)} GB (${"%.1f".format(mem.availMem / 1e9)} GB free), " +
-            storage ${"%.1f".format(stat.availableBytes / 1e9)} GB free, battery ${battery()}"
+            "storage ${"%.1f".format(stat.availableBytes / 1e9)} GB free, battery ${battery()}"
     }
 
     companion object {
