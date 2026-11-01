@@ -34,6 +34,17 @@ class DAgentApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Keep the last crash's details so the app can show them (and the person can send them) next time.
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            runCatching {
+                java.io.File(filesDir, "last-crash.txt").writeText(
+                    "D-Agent ${packageManager.getPackageInfo(packageName, 0).versionName} on ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, Android ${android.os.Build.VERSION.RELEASE}\n" +
+                        "Thread: ${t.name}\n" + android.util.Log.getStackTraceString(e).take(12_000)
+                )
+            }
+            previous?.uncaughtException(t, e)
+        }
         graph = Graph(this)
         PhoneActions.ensureChannel(this)
         BuiltinSkills.install(this, graph.skills)

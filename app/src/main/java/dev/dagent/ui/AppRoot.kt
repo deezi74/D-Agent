@@ -5,6 +5,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
@@ -43,6 +49,25 @@ fun AppRoot(g: Graph, shared: MutableState<Pair<String, Uri?>?>) {
         Screen.Voice -> VoiceMode(g) { back() }
         Screen.Discover -> DiscoverScreen(g, back = { back() }, startChat = { prompt -> g.runner.newChat(); shared.value = prompt to null; back() })
         is Screen.Settings -> SettingsHost(g, top.page, open = { go(Screen.Settings(it)) }, back = { back() })
+    }
+
+    // After a crash, show what happened once so it can be copied and sent.
+    var crash by remember { mutableStateOf(runCatching { java.io.File(g.context.filesDir, "last-crash.txt").takeIf { it.isFile }?.readText() }.getOrNull()) }
+    crash?.let { text ->
+        val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+        fun dismiss() { runCatching { java.io.File(g.context.filesDir, "last-crash.txt").delete() }; crash = null }
+        AlertDialog(
+            onDismissRequest = { dismiss() },
+            title = { Text("D-Agent closed unexpectedly") },
+            text = {
+                androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.heightIn(max = 360.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                    Text("Copy this and send it so it can be fixed:", fontSize = 13.sp)
+                    Text(text.take(3000), fontSize = 11.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                }
+            },
+            confirmButton = { TextButton({ clip.setText(androidx.compose.ui.text.AnnotatedString(text)); dismiss() }) { Text("Copy and close") } },
+            dismissButton = { TextButton({ dismiss() }) { Text("Close") } },
+        )
     }
 
     confirm?.let { req ->

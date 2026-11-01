@@ -25,7 +25,10 @@ class Speaker(context: Context, private val cloud: CloudVoice? = null) {
     /** Reads [text] aloud (used by read-aloud, the phone tool and the speaker button). */
     fun say(text: String) { scope.launch { speak(text) } }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+        android.util.Log.w("Speaker", "speech failed", e)
+        _speaking.value = false
+    })
     private var cloudJob: Job? = null
     private var player: android.media.MediaPlayer? = null
     /** Why the natural voice last failed ("" when it worked), so Settings can show it. */
@@ -133,7 +136,8 @@ class Speaker(context: Context, private val cloud: CloudVoice? = null) {
     private suspend fun play(file: java.io.File) = suspendCancellableCoroutine { cont ->
         val mp = android.media.MediaPlayer()
         player = mp
-        cont.invokeOnCancellation { runCatching { mp.stop() }; mp.release(); if (player === mp) player = null }
+        var released = false
+        cont.invokeOnCancellation { released = true; runCatching { mp.stop() }; runCatching { mp.release() }; if (player === mp) player = null }
         try {
             mp.setDataSource(file.absolutePath)
             mp.setOnCompletionListener {
@@ -147,7 +151,7 @@ class Speaker(context: Context, private val cloud: CloudVoice? = null) {
                 if (cont.isActive) cont.resumeWith(Result.failure(IllegalStateException("playback error $what")))
                 true
             }
-            mp.setOnPreparedListener { it.start() }
+            mp.setOnPreparedListener { if (!released) runCatching { it.start() } }
             mp.prepareAsync()
         } catch (e: Exception) {
             mp.release()
@@ -177,7 +181,7 @@ class Speaker(context: Context, private val cloud: CloudVoice? = null) {
         pending = null
         cloudJob?.cancel()
         cloudJob = null
-        player?.let { runCatching { it.stop() }; it.release() }
+        player?.let { runCatching { it.stop() }; runCatching { it.release() } }
         player = null
         tts.stop()
         _speaking.value = false
