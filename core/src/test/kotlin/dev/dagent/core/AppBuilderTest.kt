@@ -92,3 +92,18 @@ class AppBuilderTest {
         assertTrue(phone.text, phone.isError && phone.text.contains("Termux"))
     }
 }
+
+class AiCallTest {
+    @Test
+    fun numbersBecomeE164() {
+        assertEquals("+14045550100", dev.dagent.core.tools.AiCallClient.e164("(404) 555-0100"))
+        assertEquals("+14045550100", dev.dagent.core.tools.AiCallClient.e164("1-404-555-0100"))
+        assertEquals("+442071234567", dev.dagent.core.tools.AiCallClient.e164("+44 20 7123 4567"))
+        assertEquals(null, dev.dagent.core.tools.AiCallClient.e164("555-0100"))
+    }
+
+    @Test
+    fun callerSaysItsAnAi() {
+        assertTrue(dev.dagent.core.tools.AiCallClient.task("Dominic", "ask if they have eggs").contains("AI assistant calling for Dominic"))
+    }
+}

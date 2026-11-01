@@ -18,6 +18,8 @@ import dev.dagent.core.places.GeoPoint
 import dev.dagent.core.tools.GitHubClient
 import dev.dagent.core.tools.GitHubTool
 import dev.dagent.core.tools.AppBuilderTool
+import dev.dagent.core.tools.AiCallClient
+import dev.dagent.core.tools.AiCallTool
 import dev.dagent.core.tools.PhoneBuilder
 import dev.dagent.core.tools.PlacesTool
 import dev.dagent.core.tools.WeatherTool
@@ -301,6 +303,7 @@ class AgentRunner(private val g: Graph) {
                 ))
             }
             if (termuxTool != null) add(termuxTool)
+            if (g.connectors.aiCallKey.isNotBlank()) add(AiCallTool(AiCallClient({ g.connectors.aiCallKey }, http = g.http)) { g.connectors.ownerName() })
         }
         if (!agentMode) return quick + connected
         return quick + connected + listOf(
@@ -312,7 +315,7 @@ class AgentRunner(private val g: Graph) {
             FileWriteTool(ws),
             FileEditTool(ws),
             FileListTool(ws),
-            BrowserTool(g.browser) { vision },
+            BrowserTool(g.browser, { g.connectors.detailsText() }) { vision },
             PhoneTool(g.phone),
             ScheduleTool(g.scheduler),
             SkillTool(g.skills),

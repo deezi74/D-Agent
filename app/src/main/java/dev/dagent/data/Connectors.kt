@@ -31,6 +31,30 @@ class Connectors(context: Context, private val settings: Settings) {
         get() = settings.secret("github")
         set(v) = settings.setSecret("github", v)
 
+    /** Bland AI key for calls where the AI talks. */
+    var aiCallKey: String
+        get() = settings.secret("ai_call")
+        set(v) = settings.setSecret("ai_call", v)
+
+    /** The person's own details for checkout forms and for saying who a call is for. */
+    var myName: String
+        get() = settings.secret("me.name")
+        set(v) = settings.setSecret("me.name", v)
+    var myPhone: String
+        get() = settings.secret("me.phone")
+        set(v) = settings.setSecret("me.phone", v)
+    var myEmail: String
+        get() = settings.secret("me.email")
+        set(v) = settings.setSecret("me.email", v)
+    var myAddress: String
+        get() = settings.secret("me.address")
+        set(v) = settings.setSecret("me.address", v)
+
+    fun ownerName(): String = myName.trim().ifBlank { "the phone's owner" }
+
+    fun detailsText(): String = listOf("Name" to myName, "Phone" to myPhone, "Email" to myEmail, "Delivery address" to myAddress)
+        .filter { it.second.isNotBlank() }.joinToString("\n") { "${it.first}: ${it.second}" }
+
     var googlePlacesKey: String
         get() = settings.secret("google_places")
         set(v) = settings.setSecret("google_places", v)

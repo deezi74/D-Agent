@@ -49,11 +49,41 @@ import kotlinx.coroutines.launch
 fun ConnectorsPage(g: Graph, back: () -> Unit) {
     Page("Connectors", back) {
         Muted("Connect your own accounts. Keys stay encrypted on this phone, and nothing here needs a D-Agent account.")
+        DetailsSection(g)
+        CallsSection(g)
         EmailSection(g)
         GitHubSection(g)
         TelegramSection(g)
         TermuxSection(g)
         PlacesSection(g)
+    }
+}
+
+@Composable
+private fun DetailsSection(g: Graph) {
+    var name by remember { mutableStateOf(g.connectors.myName) }
+    var phone by remember { mutableStateOf(g.connectors.myPhone) }
+    var email by remember { mutableStateOf(g.connectors.myEmail) }
+    var address by remember { mutableStateOf(g.connectors.myAddress) }
+    Section("My details")
+    Card {
+        Muted("Used to fill in delivery and contact forms when ${g.settings.current.persona.name} orders for you, and to say who a call is for. It pays with the card already saved on each site and asks you to OK every order first. It never types card numbers or passwords.")
+        OutlinedTextField(name, { name = it; g.connectors.myName = it }, label = { Text("Your name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(phone, { phone = it; g.connectors.myPhone = it }, label = { Text("Phone") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(email, { email = it; g.connectors.myEmail = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(address, { address = it; g.connectors.myAddress = it }, label = { Text("Delivery address") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun CallsSection(g: Graph) {
+    val context = LocalContext.current
+    var key by remember { mutableStateOf(g.connectors.aiCallKey) }
+    Section("AI phone calls")
+    Card {
+        Muted("Let ${g.settings.current.persona.name} call a place and talk for you (\"call Waffle House and ask if they have eggs\"), then tell you what they said. Android doesn't let apps speak into a normal SIM call, so the call goes out from Bland AI's line using your own key. Calls cost about 9 cents a minute on their side. It always says it's an AI assistant and asks you before every call.")
+        OutlinedTextField(key, { key = it.trim(); g.connectors.aiCallKey = key }, label = { Text("Bland AI API key") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://app.bland.ai"))) }) { Text("Get a key") }
     }
 }
 

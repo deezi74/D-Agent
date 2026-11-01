@@ -141,14 +141,24 @@ class BrowserAgent(private val context: Context) {
 
     suspend fun elements(): String = jsString(ELEMENTS_JS)
 
+    /** When the person last OK'd placing an order; the final buy/pay button only works shortly after. */
+    @Volatile var orderApprovedAt = 0L
+    private fun orderApproved() = System.currentTimeMillis() - orderApprovedAt < 5 * 60_000L
+
     suspend fun click(target: String): String {
+        val guard = if (orderApproved()) "" else
+            "var lbl=(el.innerText||el.value||el.getAttribute('aria-label')||'').trim();" +
+                "if(/(place|submit|complete|confirm|finish)\\s+(my\\s+|your\\s+)?(order|purchase|payment)|\\bbuy now\\b|^pay\\b|\\bpay now\\b|\\bpay \\$|\\bpurchase\\b|^order now\\b/i.test(lbl))return 'NEEDS_APPROVAL '+lbl.slice(0,80);"
         val r = jsString(
             "(function(){var t=${q(target)};var el=document.querySelector('[data-dagent=\"'+t+'\"]');" +
                 "if(!el){try{el=document.querySelector(t)}catch(e){}}" +
                 "if(!el){var all=[...document.querySelectorAll('a,button,input[type=submit],input[type=button],[role=button],[onclick],summary,label')];" +
                 "el=all.find(e=>(e.innerText||e.value||e.getAttribute('aria-label')||'').trim().toLowerCase()===t.toLowerCase())||all.find(e=>(e.innerText||e.value||e.getAttribute('aria-label')||'').toLowerCase().includes(t.toLowerCase()));}" +
-                "if(!el)return 'not found';el.scrollIntoView({block:'center'});el.click();return 'clicked '+(el.innerText||el.value||el.tagName).trim().slice(0,80);})()"
+                "if(!el)return 'not found';" + guard + "el.scrollIntoView({block:'center'});el.click();return 'clicked '+(el.innerText||el.value||el.tagName).trim().slice(0,80);})()"
         )
+        if (r.startsWith("NEEDS_APPROVAL")) {
+            return "Didn't click \"${r.removePrefix("NEEDS_APPROVAL ").trim()}\": that places the order or pays. Call place_order with the items and total first; once the person OKs it, click it again."
+        }
         loaded = CompletableDeferred()
         withTimeoutOrNull(4_000) { loaded?.await() }
         delay(800)
@@ -235,15 +245,22 @@ class BrowserAgent(private val context: Context) {
     }
 }
 
-class BrowserTool(private val browser: BrowserAgent, private val canSeeImages: () -> Boolean) : Tool {
+class BrowserTool(
+    private val browser: BrowserAgent,
+    private val details: () -> String = { "" },
+    private val canSeeImages: () -> Boolean,
+) : Tool {
     override val name = "browser"
     override val description = "Drive a real web browser (shown live to the person). Actions: open (url), read (page text), elements (numbered list of links, buttons and fields), " +
         "click (target: element number, CSS selector or visible text), type (target, text, submit), scroll (direction), back, screenshot (see the page), js (run JavaScript), " +
-        "hand_over (reason: let the person do a sign-in, captcha, code or payment themselves, then continue). " +
-        "Typical flow: open, elements, click or type, read. Never type passwords; hand over instead."
+        "hand_over (reason: let the person do a sign-in, captcha or code themselves, then continue). " +
+        "my_details: the person's name, phone, email and delivery address for filling forms. " +
+        "place_order (summary, total): ask the person to OK the order; required before the final place-order or pay button. " +
+        "Orders: do the whole thing yourself (search, pick, cart, delivery details from my_details, the payment already saved on the site), then place_order, then click the final button and read the confirmation. " +
+        "Sign-ins are remembered, so hand over only the first time. Never type passwords or card numbers; hand over instead."
     override val parameters = schema {
         title()
-        string("action", "What to do.", required = true, enum = listOf("open", "read", "elements", "click", "type", "scroll", "back", "screenshot", "js", "hand_over"))
+        string("action", "What to do.", required = true, enum = listOf("open", "read", "elements", "click", "type", "scroll", "back", "screenshot", "js", "hand_over", "my_details", "place_order"))
         string("url", "For open.")
         string("target", "For click and type: element number from elements, a CSS selector, or visible text.")
         string("text", "For type.")
@@ -251,6 +268,8 @@ class BrowserTool(private val browser: BrowserAgent, private val canSeeImages: (
         string("direction", "For scroll: up or down.", enum = listOf("up", "down"))
         string("script", "For js: JavaScript; the last expression's value is returned.")
         string("reason", "For hand_over: what the person needs to do, in a few words.")
+        string("summary", "For place_order: store, items, delivery address and time.")
+        string("total", "For place_order: the total shown at checkout, e.g. $23.18.")
     }
 
     override suspend fun run(args: Args, ctx: ToolContext): ToolResult = when (args.requireString("action")) {
@@ -265,6 +284,17 @@ class BrowserTool(private val browser: BrowserAgent, private val canSeeImages: (
             else ToolResult.ok("The current model cannot see images; use read or elements instead.")
         "js" -> ToolResult.ok(clip(browser.js(args.requireString("script")), 12_000))
         "hand_over" -> ToolResult.ok(browser.handOver(args.string("reason") ?: "Your turn"))
+        "my_details" -> details().ifBlank { "" }.let { d ->
+            if (d.isBlank()) ToolResult.error("No details saved. Ask the person, or they can add them in Settings > Connectors > My details.") else ToolResult.ok(d)
+        }
+        "place_order" -> {
+            val total = args.string("total")?.takeIf { it.isNotBlank() } ?: return ToolResult.error("Say the total from the checkout page.")
+            val summary = args.string("summary").orEmpty()
+            if (ctx.confirm("Place this order for $total?", summary + "\n\nSite: " + browser.view.value.url.substringAfter("://").substringBefore('/'))) {
+                browser.orderApprovedAt = System.currentTimeMillis()
+                ToolResult.ok("Approved. Click the final place-order / pay button now (within 5 minutes), then read the confirmation page.")
+            } else ToolResult.error("The person didn't OK this order. Don't place it.")
+        }
         else -> ToolResult.error("Unknown action")
     }
 }
