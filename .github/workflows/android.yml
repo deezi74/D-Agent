@@ -49,7 +49,7 @@ jobs:
 
       - name: On-phone model server cache
         id: llama
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: deps/llama-out/libllamaserver.so
           key: llama-server-${{ env.LLAMA_TAG }}-${{ hashFiles('scripts/build-llama-server.sh') }}
@@ -63,6 +63,14 @@ jobs:
           fi
           if [ -f deps/llama-out/libllamaserver.so ]; then cp deps/llama-out/libllamaserver.so app/src/main/jniLibs/arm64-v8a/; fi
           ls -la app/src/main/jniLibs/arm64-v8a/
+
+      # Saved right away (not at the end) so a later failing step doesn't throw away a 10 minute build.
+      - name: Save model server cache
+        if: steps.llama.outputs.cache-hit != 'true' && hashFiles('deps/llama-out/libllamaserver.so') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: deps/llama-out/libllamaserver.so
+          key: llama-server-${{ env.LLAMA_TAG }}-${{ hashFiles('scripts/build-llama-server.sh') }}
 
       - name: Core tests
         run: ./gradlew --no-daemon :core:test

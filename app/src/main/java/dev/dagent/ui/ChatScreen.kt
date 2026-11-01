@@ -355,7 +355,7 @@ private fun AssistantBlock(g: Graph, m: Msg, results: Map<String, Msg>, infos: M
                 name = call.name,
                 running = l?.running == true,
                 progress = l?.progress.orEmpty(),
-                millis = l?.millis ?: info?.millis ?: 0,
+                millis = l?.millis ?: info?.millis ?: 0L,
                 error = l?.error ?: info?.error ?: false,
                 args = call.arguments,
                 result = results[call.id]?.text,

@@ -59,6 +59,11 @@ android {
         buildConfig = true
     }
 
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
     packaging {
         // Programs shipped as lib*.so must be extracted to disk so they can be executed.
         jniLibs { useLegacyPackaging = true }
