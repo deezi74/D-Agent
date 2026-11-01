@@ -125,3 +125,35 @@ fun clip(text: String, max: Int = 12_000): String {
     val tail = text.takeLast(max / 3)
     return "$head\n\n[... ${text.length - head.length - tail.length} characters cut ...]\n\n$tail"
 }
+
+/**
+ * A lighter copy of a tool for small on-phone models: one-sentence description and no
+ * per-field descriptions, so the prompt the phone has to read is a fraction of the size.
+ */
+class SlimTool(private val inner: Tool) : Tool by inner {
+    override val description: String = inner.description.let { d ->
+        val cut = Regex("[.!?](\\s|$)").find(d)?.range?.first?.plus(1) ?: d.length
+        d.take(minOf(cut, 180)).trim()
+    }
+    override val parameters: JsonObject = slim(inner.parameters)
+
+    companion object {
+        fun slim(schema: JsonObject): JsonObject {
+            val props = schema["properties"] as? JsonObject ?: return schema
+            val kept = props.filterKeys { it != "title" }.mapValues { (_, v) ->
+                val o = v as? JsonObject ?: return@mapValues v
+                JsonObject(o.filterKeys { it != "description" })
+            }
+            val req = (schema["required"] as? JsonArray)?.filter { (it as? JsonPrimitive)?.contentOrNull != "title" }
+            return buildJsonObject {
+                put("type", "object")
+                put("properties", JsonObject(kept))
+                if (!req.isNullOrEmpty()) put("required", JsonArray(req))
+            }
+        }
+
+        /** Tools worth their prompt space on a phone-sized model. */
+        val PHONE_CHAT = setOf("web_search", "web_fetch", "weather", "places", "phone", "remember", "recall", "make_image")
+        val PHONE_AGENT = PHONE_CHAT + setOf("shell", "browser", "file_read", "file_write", "file_list", "schedule", "termux", "ai_call")
+    }
+}

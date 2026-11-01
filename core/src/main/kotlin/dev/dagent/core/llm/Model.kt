@@ -64,6 +64,8 @@ sealed interface LlmEvent {
     data class ToolCalls(val calls: List<ToolCall>) : LlmEvent
     data class Usage(val input: Int, val output: Int) : LlmEvent
     data class Finish(val reason: String) : LlmEvent
+    /** The on-phone server reading the prompt: [done] of [total] tokens. */
+    data class Progress(val done: Int, val total: Int) : LlmEvent
 }
 
 /** Thrown for a failed request; [status] is the HTTP status when there was one. */

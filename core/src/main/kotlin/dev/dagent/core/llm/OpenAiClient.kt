@@ -38,6 +38,8 @@ class OpenAiClient(
     private val reasoning: ReasoningStyle = ReasoningStyle.NONE,
 ) : LlmClient {
     private val base = baseUrl.trimEnd('/')
+    /** The phone's own llama.cpp server: it can report how far it is through reading the prompt. */
+    private val llamaServer = base.contains("127.0.0.1:${Providers.LOCAL_PORT}")
 
     override fun stream(request: ChatRequest): Flow<LlmEvent> = flow {
         val body = buildBody(request).toString()
@@ -61,6 +63,11 @@ class OpenAiClient(
                     val o = u["completion_tokens"]?.jsonPrimitive?.intOrNull ?: 0
                     if (i + o > 0) emit(LlmEvent.Usage(i, o))
                 }
+            }
+            (obj["prompt_progress"] as? JsonObject)?.let { pp ->
+                val total = pp["total"]?.jsonPrimitive?.intOrNull ?: 0
+                val done = pp["processed"]?.jsonPrimitive?.intOrNull ?: 0
+                if (total > 0) emit(LlmEvent.Progress(done, total))
             }
             val choice = (obj["choices"] as? JsonArray)?.firstOrNull()?.jsonObject ?: return@collect
             choice["finish_reason"]?.jsonPrimitive?.contentOrNull?.let { finish = it }
@@ -107,6 +114,10 @@ class OpenAiClient(
     internal fun buildBody(req: ChatRequest): JsonObject = buildJsonObject {
         put("model", req.model)
         put("stream", true)
+        if (llamaServer) {
+            put("return_progress", true)
+            put("cache_prompt", true)
+        }
         req.temperature?.let { put("temperature", it) }
         if (req.think) when (reasoning) {
             ReasoningStyle.EFFORT -> put("reasoning_effort", "medium")

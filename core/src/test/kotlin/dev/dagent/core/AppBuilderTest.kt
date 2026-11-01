@@ -107,3 +107,16 @@ class AiCallTest {
         assertTrue(dev.dagent.core.tools.AiCallClient.task("Dominic", "ask if they have eggs").contains("AI assistant calling for Dominic"))
     }
 }
+
+class SlimToolTest {
+    @Test
+    fun slimDropsDescriptionsAndTitle() {
+        val t = AppBuilderTool(GitHubClient({ "t" }), { emptySet() }, { })
+        val slim = dev.dagent.core.agent.SlimTool(t)
+        assertTrue(slim.description.length <= 180)
+        assertFalse(slim.parameters.toString().contains("\"description\""))
+        assertFalse(slim.parameters.toString().contains("\"title\""))
+        assertTrue(slim.parameters.toString().length < t.parameters.toString().length / 2)
+        assertEquals("app_builder", slim.name)
+    }
+}

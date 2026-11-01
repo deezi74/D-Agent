@@ -261,6 +261,9 @@ class LocalModels(private val context: Context) {
         throw IOException("The on-phone model took too long to load. Try a smaller model.")
     }
 
+    /** True while the on-phone model server process is running. */
+    fun alive(): Boolean = process?.isAlive == true
+
     private fun healthy(): Boolean = runCatching {
         http.newCall(Request.Builder().url("http://127.0.0.1:${Providers.LOCAL_PORT}/health").build()).execute().use { it.isSuccessful }
     }.getOrDefault(false)

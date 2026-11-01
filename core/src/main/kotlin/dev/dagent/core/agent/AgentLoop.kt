@@ -127,8 +127,14 @@ class AgentLoop(
         val filter = if (!nativeTools && offerTools) TextToolProtocol.StreamFilter() else null
         // Some models write their thinking inline between <think> tags.
         val think = ThinkSplitter()
+        var reading = false
         client.stream(request).collect { ev ->
+            if (reading && ev !is LlmEvent.Progress) { reading = false; emit(AgentEvent.Notice("")) }
             when (ev) {
+                is LlmEvent.Progress -> {
+                    reading = true
+                    emit(AgentEvent.Notice("Reading your message on the phone... ${(ev.done * 100L / ev.total).coerceIn(0, 100)}% (${ev.total} tokens)"))
+                }
                 is LlmEvent.Text -> {
                     text.append(ev.delta)
                     val (visible, thought) = think.feed(ev.delta)

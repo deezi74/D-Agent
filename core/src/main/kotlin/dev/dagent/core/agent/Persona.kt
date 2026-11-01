@@ -85,7 +85,7 @@ object PromptBuilder {
                     else "- Your Linux computer is not set up yet. If a task needs it, tell the person to tap Settings > Linux computer > Install (about 30 seconds).\n"
                 )
             }
-            if ("browser" in toolNames) append("- The browser tool drives a real web browser for pages that need JavaScript, clicks, forms or a login. When a page needs the person (password, code, payment, captcha) use action=hand_over.\n")
+            if ("browser" in toolNames) append("- The browser tool drives a real web browser for pages that need JavaScript, clicks, forms or a login. When a page needs the person (password, code, captcha) use action=hand_over; for orders use place_order before paying.\n")
             if ("phone" in toolNames) append("- The phone tool reaches alarms, calendar, contacts, texts, calls, apps, the clipboard, notifications, location and more.\n")
             if ("make_image" in toolNames) append("- make_image creates pictures; they show up in the chat by themselves.\n")
             if ("remember" in toolNames) append("- When the person shares something worth knowing next time, save it with remember without making a fuss. \"Remember that\" refers to their previous message.\n")

@@ -19,6 +19,7 @@ import dev.dagent.core.places.GeoPoint
 import dev.dagent.core.tools.GitHubClient
 import dev.dagent.core.tools.GitHubTool
 import dev.dagent.core.tools.AppBuilderTool
+import dev.dagent.core.agent.SlimTool
 import dev.dagent.core.tools.AiCallClient
 import dev.dagent.core.tools.AiCallTool
 import dev.dagent.core.tools.PhoneBuilder
@@ -201,7 +202,12 @@ class AgentRunner(private val g: Graph) {
                 2 -> false
                 else -> !isLocal && VISION.containsMatchIn(provider.model.lowercase())
             }
-            val tools = tools(prefs.agentMode, vision)
+            // Small on-phone models read the whole prompt on the CPU before answering, so they get a
+            // short list of slimmed tools instead of every tool's full description.
+            val tools = tools(prefs.agentMode, vision).let { all ->
+                if (!isLocal) all
+                else all.filter { it.name in (if (prefs.agentMode) SlimTool.PHONE_AGENT else SlimTool.PHONE_CHAT) }.map { SlimTool(it) }
+            }
             refreshPlace()
             val situation = Situation(
                 now = ZonedDateTime.now(),
@@ -239,7 +245,16 @@ class AgentRunner(private val g: Graph) {
             throw e
         } catch (e: Throwable) {
             val msg = e.message ?: e::class.simpleName.orEmpty()
-            _state.update { it.copy(error = if (msg.startsWith("Network")) Providers.explainNetwork(msg, provider.baseUrl) else msg) }
+            val onPhone = provider.id == Providers.LOCAL_ID
+            val shown = when {
+                onPhone && msg.startsWith("Network") && !g.local.alive() ->
+                    "The on-phone model stopped, most likely because the phone ran out of memory. Pick a smaller model (1-2B) in Settings > On-phone models, or close other apps."
+                onPhone && msg.startsWith("Network") ->
+                    "The on-phone model is taking too long. Small models (Qwen3 1.7B, Llama 3.2 1B) answer much faster; Chat mode is lighter than Agent mode."
+                msg.startsWith("Network") -> Providers.explainNetwork(msg, provider.baseUrl)
+                else -> msg
+            }
+            _state.update { it.copy(error = shown) }
         }
     }
 
