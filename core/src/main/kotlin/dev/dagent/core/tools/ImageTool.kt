@@ -33,6 +33,8 @@ import java.util.concurrent.TimeUnit
  * Makes pictures with Pollinations (free; a key from enter.pollinations.ai lifts the limits and
  * unlocks more models). Saved under /workspace/images so the person sees them in the chat.
  */
+private val WEBSITE = Regex("\\b(website|web site|web page|webpage|landing page|homepage|home page)\\b", RegexOption.IGNORE_CASE)
+
 class ImageTool(
     http: OkHttpClient,
     private val ws: Workspace,
@@ -58,6 +60,9 @@ class ImageTool(
 
     override suspend fun run(args: Args, ctx: ToolContext): ToolResult = withContext(Dispatchers.IO) {
         val prompt = args.requireString("prompt")
+        if (args.string("edit").isNullOrBlank() && WEBSITE.containsMatchIn(prompt)) {
+            return@withContext ToolResult.error("Don't draw a website. Call make_website with a name and the full HTML page instead; it shows a live preview.")
+        }
         args.string("edit")?.takeIf { it.isNotBlank() }?.let { path ->
             val input = runCatching { ws.resolve(path) }.getOrNull()?.takeIf { it.isFile }
                 ?: return@withContext ToolResult.error("No image at $path.")
@@ -86,12 +91,26 @@ class ImageTool(
         ctx.progress("Painting...")
         val req = Request.Builder().url(url).header("User-Agent", "D-Agent")
         if (token.isNotEmpty()) req.header("Authorization", "Bearer $token")
+        // The free tier answers "busy" (402/429/5xx) when it's crowded; wait and try again a few times.
+        var wait = 6_000L
+        var attempt = 0
+        while (true) {
         slow.newCall(req.build()).execute().use { r ->
             val type = r.header("Content-Type").orEmpty()
             if (!r.isSuccessful || !type.startsWith("image")) {
-                val body = r.body?.string().orEmpty().take(300)
-                return@withContext ToolResult.error("Image service said HTTP ${r.code}${if (body.isNotBlank()) ": $body" else ""}. " +
-                    if (r.code == 401 || r.code == 402 || r.code == 429) "Add a free Pollinations key in Settings > Images for higher limits." else "Try again or change the prompt.")
+                val busy = r.code == 402 || r.code == 429 || r.code >= 500
+                if (busy && attempt < 3) {
+                    attempt++
+                    ctx.progress("Image service is busy, trying again...")
+                    Thread.sleep(wait)
+                    wait *= 2
+                    return@use null
+                }
+                val body = r.body?.string().orEmpty().take(200)
+                return@withContext ToolResult.error(
+                    if (busy) "The free picture service (Pollinations) is busy right now (HTTP ${r.code}). Tell the person to try again in a minute, or add a free Pollinations key (enter.pollinations.ai) in Settings > Tools and behavior > Images for steady access. Image making itself works."
+                    else "Image service said HTTP ${r.code}${if (body.isNotBlank()) ": $body" else ""}. Try again or change the prompt."
+                )
             }
             val ext = if (type.contains("png")) "png" else if (type.contains("webp")) "webp" else "jpg"
             val dir = File(ws.root, "images").apply { mkdirs() }
@@ -99,7 +118,10 @@ class ImageTool(
             val f = File(dir, "$slug-$seed.$ext")
             r.body!!.byteStream().use { input -> f.outputStream().use { input.copyTo(it) } }
             ToolResult.ok("Made ${ws.display(f)} (${w}x$h, model $model, seed $seed). It is already shown to the person.", files = listOf(f))
+        }?.let { return@withContext it }
         }
+        @Suppress("UNREACHABLE_CODE")
+        ToolResult.error("Image service didn't answer.")
     }
 
     private fun edit(prompt: String, input: File): ByteArray {

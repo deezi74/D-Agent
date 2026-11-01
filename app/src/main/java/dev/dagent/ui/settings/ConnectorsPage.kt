@@ -126,7 +126,7 @@ private fun EmailSection(g: Graph) {
         OutlinedTextField(user, { user = it.trim() }, label = { Text("Email address") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(pass, { pass = it }, label = { Text("App password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         Button({
-            val acc = EmailAccount(host.trim(), preset.port, user, pass.replace(" ", ""))
+            val acc = EmailAccount(host.trim(), preset.port, user.trim(), cleanPassword(pass, preset.id))
             status = "Checking..."
             scope.launch {
                 runCatching { g.email.test(acc) }
@@ -226,4 +226,14 @@ private fun PlacesSection(g: Graph) {
         Muted("Weather (Open-Meteo) and nearby places (OpenStreetMap) work with no key. A Google Places key adds ratings and live open/closed status.")
         OutlinedTextField(key, { key = it.trim(); g.connectors.googlePlacesKey = key }, label = { Text("Google Places key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
     }
+}
+
+/**
+ * Pasted app passwords often carry invisible characters (non-breaking or zero-width spaces from
+ * Google's page). Gmail app passwords are exactly 16 letters, so keep only letters for Gmail;
+ * for others drop every kind of whitespace.
+ */
+internal fun cleanPassword(raw: String, provider: String): String {
+    val noSpace = raw.filterNot { it.isWhitespace() || it == '\u00A0' || it == '\u200B' || it == '\u200C' || it == '\u200D' || it == '\u2060' || it == '\uFEFF' }
+    return if (provider == "gmail") noSpace.filter { it.isLetter() }.lowercase() else noSpace
 }
