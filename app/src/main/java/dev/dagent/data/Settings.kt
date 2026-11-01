@@ -39,6 +39,7 @@ data class AppPrefs(
     val localContext: Int = 8192,
     val localThreads: Int = 0,
     val onboarded: Boolean = false,
+    val defaultSim: Int = 0, // 0 phone default, 1 or 2
 )
 
 /** Plain preferences in one file; API keys in an encrypted one. */
@@ -82,6 +83,7 @@ class Settings(context: Context) {
         localContext = prefs.getInt("local.ctx", 8192),
         localThreads = prefs.getInt("local.threads", 0),
         onboarded = prefs.getBoolean("onboarded", false),
+        defaultSim = prefs.getInt("sim", 0),
     )
 
     fun update(block: (AppPrefs) -> AppPrefs) {
@@ -105,6 +107,7 @@ class Settings(context: Context) {
             .putInt("local.ctx", n.localContext)
             .putInt("local.threads", n.localThreads)
             .putBoolean("onboarded", n.onboarded)
+            .putInt("sim", n.defaultSim)
             .apply()
         _state.value = n
     }

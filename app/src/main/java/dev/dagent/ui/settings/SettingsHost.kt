@@ -39,7 +39,7 @@ private fun Home(g: Graph, open: (String) -> Unit, back: () -> Unit) {
     val linux by g.linux.state.collectAsState()
     val provider = g.settings.provider(prefs.providerId)
     Page("Settings", back) {
-        NavRow(Icons.Default.Face, "${prefs.persona.name}: look and personality", "Name, picture, voice, colors, about you") { open("persona") }
+        NavRow(Icons.Default.Face, "${prefs.persona.name}: look and personality", "Name, character, picture, colors, about you") { open("persona") }
         NavRow(Icons.Default.Cloud, "AI providers", "${provider.preset.name} · ${provider.model}") { open("providers") }
         NavRow(Icons.Default.PhoneAndroid, "On-phone models", "Offline AI with GGUF models") { open("local") }
         NavRow(Icons.Default.Terminal, "Linux computer", when (linux) {

@@ -35,6 +35,7 @@ class PhoneTool(private val phone: PhoneActions) : Tool {
         string("mode", "maps: search or navigate.")
         boolean("on", "flashlight on or off.")
         integer("level", "Volume 0 to 100.")
+        string("sim", "SIM slot for call or sms_send: 1 or 2. Leave out to use the default.")
     }
 
     override suspend fun run(args: Args, ctx: ToolContext): ToolResult {

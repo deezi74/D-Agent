@@ -113,7 +113,9 @@ import dev.dagent.core.agent.PlanBoard
 import dev.dagent.core.llm.Msg
 import dev.dagent.core.llm.Role
 import dev.dagent.data.ToolInfo
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import dev.dagent.character.Mood
 import java.io.File
 
 private val IMAGE_EXT = setOf("png", "jpg", "jpeg", "webp", "gif")
@@ -131,6 +133,21 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
     var input by remember { mutableStateOf("") }
     val attachments = remember { mutableStateListOf<Uri>() }
     var showModels by remember { mutableStateOf(false) }
+    val look by g.character.active.collectAsState()
+    val confirm by g.interactions.confirm.collectAsState()
+    var cheer by remember { mutableStateOf(false) }
+    var wasRunning by remember { mutableStateOf(false) }
+    LaunchedEffect(state.running) {
+        if (wasRunning && !state.running && state.error.isBlank()) { cheer = true; delay(5000); cheer = false }
+        wasRunning = state.running
+    }
+    val mood = when {
+        confirm != null -> Mood.WAITING
+        state.running -> Mood.WORKING
+        state.error.isNotBlank() -> Mood.ERROR
+        cheer -> Mood.HAPPY
+        else -> Mood.IDLE
+    }
 
     LaunchedEffect(shared.value) {
         shared.value?.let { (text, img) ->
@@ -155,7 +172,7 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
             // Header: menu, the agent, the model, Agent/Chat switch.
             Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton({ scope.launch { drawer.open() } }) { Icon(Icons.Default.Menu, "Chats", tint = p.text) }
-                AgentAvatar(prefs.persona.name, prefs.avatarPath, 38.dp, busy = state.running, modifier = Modifier.clickable { openSettings("persona") })
+                AgentAvatar(prefs.persona.name, prefs.avatarPath, if (look != null) 44.dp else 38.dp, busy = state.running, modifier = Modifier.clickable { openSettings("persona") }, look = look, mood = mood)
                 Column(Modifier.weight(1f).padding(start = 10.dp).clickable { showModels = true }) {
                     Text(prefs.persona.name, color = p.text, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     Text(
@@ -169,7 +186,7 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
 
             Box(Modifier.weight(1f)) {
                 if (state.session.messages.isEmpty() && !state.running) {
-                    EmptyChat(prefs.persona.name, prefs.avatarPath, prefs.persona.userName, prefs.agentMode) { input = it }
+                    EmptyChat(prefs.persona.name, prefs.avatarPath, prefs.persona.userName, prefs.agentMode, look) { input = it }
                 } else {
                     Transcript(g, state)
                 }
@@ -220,7 +237,7 @@ private fun ModeSwitch(agent: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun EmptyChat(name: String, avatar: String, user: String, agent: Boolean, pick: (String) -> Unit) {
+private fun EmptyChat(name: String, avatar: String, user: String, agent: Boolean, look: dev.dagent.character.CharacterLook?, pick: (String) -> Unit) {
     val p = LocalPalette.current
     val ideas = if (agent) listOf(
         "What's the biggest news today? Give me the short version with sources.",
@@ -240,7 +257,7 @@ private fun EmptyChat(name: String, avatar: String, user: String, agent: Boolean
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        AgentAvatar(name, avatar, 84.dp)
+        AgentAvatar(name, avatar, if (look != null) 120.dp else 84.dp, look = look)
         Spacer(Modifier.height(14.dp))
         Text("Hey${if (user.isNotBlank()) " $user" else ""}, I'm $name.", color = p.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text(

@@ -10,6 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import dev.dagent.Graph
 import dev.dagent.R
 import dev.dagent.browser.BrowserTool
+import dev.dagent.character.CharacterTool
 import dev.dagent.core.agent.AgentEvent
 import dev.dagent.core.agent.AgentLoop
 import dev.dagent.core.agent.AgentOptions
@@ -267,6 +268,7 @@ class AgentRunner(private val g: Graph) {
             WebSearchTool(g.search),
             WebFetchTool(g.http),
             ImageTool(g.http, ws) { g.settings.secret(Settings.POLLINATIONS_KEY) },
+            CharacterTool(g.character),
             RememberTool(g.memory),
             RecallTool(g.memory),
         )

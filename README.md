@@ -8,11 +8,11 @@ A personal AI agent for Android. It does the work instead of describing it: sear
 - **Native tool calling** with OpenAI-compatible APIs and Anthropic, streamed, with automatic retries, a loop guard, and a text fallback for small local models.
 - **Linux computer.** Alpine Linux under PRoot, installed in one tap. Python, Node, git, curl and anything from `apk`. The agent's files live in `/workspace`, shared with the file tools. A `phone` command lets Linux scripts reach the phone.
 - **Live browser** the agent can open, read, click and type in. You watch it in the chat and can take over for sign-ins, codes or payments.
-- **Phone actions:** notifications, clipboard, open apps and links, alarms, timers, calendar, contacts, texts, calls, email drafts, maps, location, battery, flashlight, volume, speech.
+- **Phone actions:** notifications, clipboard, open apps and links, alarms, timers, calendar, contacts, texts and calls placed by the agent (pick SIM 1 or SIM 2), email drafts, maps, location, battery, flashlight, volume, speech.
 - **Images** from a prompt (Pollinations; works without a key).
 - **Memory** of facts about you, **skills** the agent reads before tasks and writes after it learns something, and **scheduled tasks** that run later or daily and notify you.
-- **Your agent:** name, picture, personality (witty by default), accent color.
-- **Brains:** FreeLLMAPI in Termux (`http://localhost:3001/v1`, model `auto`), OpenRouter, Anthropic, OpenAI, Gemini, xAI, Groq, Mistral, Together, Ollama, any OpenAI-compatible server, or **offline on the phone** with GGUF models (Llama 3.2, Granite 3.3, Gemma 3, Phi-4 mini) through a bundled llama.cpp server.
+- **Your agent:** name, personality (witty by default), accent color, and a face: your own picture or a **character** you describe. Pick one of four drawings in a style you like (3D toy, anime, comic, clay, pixel, neon, painted, sticker, realistic) and it gets a pose for each mood (resting, working, waiting on you, done, oops) that changes live in the chat. You can also ask for a new look in the chat.
+- **Brains:** FreeLLMAPI in Termux (`http://localhost:3001/v1`, model `auto`), OpenRouter, Anthropic, OpenAI, Gemini, xAI, Groq, Mistral, Together, Ollama, any OpenAI-compatible server, or **offline on the phone** with GGUF models through a bundled llama.cpp server: one-tap Qwen3 (0.6B to 8B), Qwen2.5 3B, Llama 3.2, Gemma 3, Granite 3.3 and Phi-4 mini with a pick for your phone's RAM, any GGUF from a Hugging Face search, or your own .gguf file.
 
 ## Install
 

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import dev.dagent.agent.AgentRunner
 import dev.dagent.browser.BrowserAgent
+import dev.dagent.character.CharacterStudio
 import dev.dagent.core.agent.MemoryStore
 import dev.dagent.core.agent.SkillLibrary
 import dev.dagent.core.tools.WebSearch
@@ -49,12 +50,17 @@ class Graph(val context: Context) {
     val skills = SkillLibrary(File(context.filesDir, "skills"))
     val interactions = Interactions(context)
     val speaker by lazy { Speaker(context) }
-    val phone = PhoneActions(context, interactions, { settings.current.confirmRisky }, { speaker.say(it) })
+    val phone = PhoneActions(context, interactions, { settings.current.confirmRisky }, { speaker.say(it) }, { settings.current.defaultSim })
     val bridge = PhoneBridge { action, args -> phone.run(action, args) }.also { it.start() }
     val linux = LinuxComputer(context, workspace.root, skills.dir, bridge, http).also { if (it.installed) it.configure() }
     val browser = BrowserAgent(context)
     val local = LocalModels(context)
     val search = WebSearch(http) { settings.current.searxUrl }
     val scheduler = Scheduler(context)
+    val character = CharacterStudio(
+        context, http, File(workspace.root, "images/characters"),
+        pollinationsKey = { settings.secret(Settings.POLLINATIONS_KEY) },
+        openAi = { settings.provider("openai").takeIf { it.apiKey.isNotBlank() }?.let { it.baseUrl to it.apiKey } },
+    )
     val runner = AgentRunner(this)
 }

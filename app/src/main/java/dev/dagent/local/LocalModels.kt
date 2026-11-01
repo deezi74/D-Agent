@@ -17,9 +17,27 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/** A GGUF model the app suggests. Sizes are the Q4_K_M files on Hugging Face. */
-data class CatalogModel(val id: String, val name: String, val maker: String, val url: String, val bytes: Long, val note: String) {
-    val fileName get() = url.substringAfterLast('/')
+/** A GGUF model the app suggests. Sizes are the exact Q4_K_M file sizes on Hugging Face. */
+data class CatalogModel(
+    val id: String,
+    val name: String,
+    val maker: String,
+    val repo: String,
+    val file: String,
+    val bytes: Long,
+    val minRamGb: Int,
+    val tag: String,
+    val note: String,
+) {
+    val fileName get() = file
+    val url get() = "https://huggingface.co/$repo/resolve/main/$file"
+}
+
+/** A repository or file found on Hugging Face. */
+data class HfRepo(val id: String, val downloads: Long, val likes: Long)
+data class HfFile(val repo: String, val path: String, val bytes: Long) {
+    val fileName get() = path.substringAfterLast('/')
+    val url get() = "https://huggingface.co/$repo/resolve/main/$path"
 }
 
 /**
@@ -28,12 +46,42 @@ data class CatalogModel(val id: String, val name: String, val maker: String, val
  */
 class LocalModels(private val context: Context) {
     val catalog = listOf(
-        CatalogModel("llama32-1b", "Llama 3.2 1B Instruct", "Meta", "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf", 807_694_464, "Smallest and fastest. Good for quick chat on any phone."),
-        CatalogModel("granite33-2b", "Granite 3.3 2B Instruct", "IBM", "https://huggingface.co/bartowski/ibm-granite_granite-3.3-2b-instruct-GGUF/resolve/main/ibm-granite_granite-3.3-2b-instruct-Q4_K_M.gguf", 1_545_303_616, "Small and good at using tools."),
-        CatalogModel("llama32-3b", "Llama 3.2 3B Instruct", "Meta", "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf", 2_019_377_696, "Balanced. Needs about 4 GB of free RAM."),
-        CatalogModel("gemma3-4b", "Gemma 3 4B Instruct", "Google", "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/resolve/main/google_gemma-3-4b-it-Q4_K_M.gguf", 2_489_758_112, "Strong writing. Needs about 5 GB of free RAM."),
-        CatalogModel("phi4-mini", "Phi-4 mini Instruct", "Microsoft", "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf", 2_491_874_688, "Good at reasoning and math. Needs about 5 GB of free RAM."),
+        CatalogModel("qwen3-0.6b", "Qwen3 0.6B", "Qwen", "bartowski/Qwen_Qwen3-0.6B-GGUF", "Qwen_Qwen3-0.6B-Q4_K_M.gguf", 484_220_320, 3, "Fastest",
+            "Runs on any phone and answers almost instantly. Handles simple tool calls like the flashlight or a timer."),
+        CatalogModel("llama32-1b", "Llama 3.2 1B Instruct", "Meta", "bartowski/Llama-3.2-1B-Instruct-GGUF", "Llama-3.2-1B-Instruct-Q4_K_M.gguf", 807_694_464, 3, "Tiny",
+            "Small and quick for everyday chat on any phone."),
+        CatalogModel("gemma3-1b", "Gemma 3 1B", "Google", "bartowski/google_gemma-3-1b-it-GGUF", "google_gemma-3-1b-it-Q4_K_M.gguf", 806_058_496, 4, "Light writer",
+            "Quick and friendly for chatting and writing. Less dependable with multi-step tool use."),
+        CatalogModel("qwen3-1.7b", "Qwen3 1.7B", "Qwen", "bartowski/Qwen_Qwen3-1.7B-GGUF", "Qwen_Qwen3-1.7B-Q4_K_M.gguf", 1_282_439_584, 4, "Best balance",
+            "The best pick for most phones. Reliable with tools, web search and phone controls, and thinks before it answers."),
+        CatalogModel("granite33-2b", "Granite 3.3 2B Instruct", "IBM", "bartowski/ibm-granite_granite-3.3-2b-instruct-GGUF", "ibm-granite_granite-3.3-2b-instruct-Q4_K_M.gguf", 1_545_303_616, 4, "Tool user",
+            "Small and good at using tools."),
+        CatalogModel("llama32-3b", "Llama 3.2 3B Instruct", "Meta", "bartowski/Llama-3.2-3B-Instruct-GGUF", "Llama-3.2-3B-Instruct-Q4_K_M.gguf", 2_019_377_696, 6, "All-rounder",
+            "Balanced chat and tools. Good on 6 GB phones."),
+        CatalogModel("qwen2.5-3b", "Qwen2.5 3B Instruct", "Qwen", "bartowski/Qwen2.5-3B-Instruct-GGUF", "Qwen2.5-3B-Instruct-Q4_K_M.gguf", 1_929_903_264, 6, "Snappy agent",
+            "Strong at tool calling with no thinking pause, so replies start sooner. Good on 6 GB phones."),
+        CatalogModel("qwen3-4b", "Qwen3 4B", "Qwen", "bartowski/Qwen_Qwen3-4B-GGUF", "Qwen_Qwen3-4B-Q4_K_M.gguf", 2_497_280_960, 8, "Smartest for 8 GB",
+            "Noticeably smarter research and planning. Slower, so best on phones with 8 GB of RAM or more."),
+        CatalogModel("gemma3-4b", "Gemma 3 4B", "Google", "bartowski/google_gemma-3-4b-it-GGUF", "google_gemma-3-4b-it-Q4_K_M.gguf", 2_489_758_112, 8, "Best writing",
+            "Great general knowledge and natural writing. Tool use is decent; Qwen3 4B is better at it."),
+        CatalogModel("phi4-mini", "Phi-4 mini Instruct", "Microsoft", "bartowski/microsoft_Phi-4-mini-instruct-GGUF", "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf", 2_491_874_688, 8, "Math and logic",
+            "Good at reasoning and math."),
+        CatalogModel("qwen3-8b", "Qwen3 8B", "Qwen", "bartowski/Qwen_Qwen3-8B-GGUF", "Qwen_Qwen3-8B-Q4_K_M.gguf", 5_027_784_224, 12, "Flagship only",
+            "Closest to a cloud model. Needs 12 GB of RAM or more and patience; expect a few words per second."),
     )
+
+    /** The model D-Agent suggests for this phone's memory. */
+    fun best(): CatalogModel {
+        val gb = totalRamGb()
+        val id = when {
+            gb >= 7.5 -> "qwen3-4b"
+            gb >= 3.6 -> "qwen3-1.7b"
+            else -> "qwen3-0.6b"
+        }
+        return catalog.first { it.id == id }
+    }
+
+    fun fits(m: CatalogModel): Boolean = totalRamGb() >= m.minRamGb - 0.5
 
     val dir: File = (context.getExternalFilesDir("models") ?: File(context.filesDir, "models")).apply { mkdirs() }
     private val server = File(context.applicationInfo.nativeLibraryDir, "libllamaserver.so")
@@ -66,17 +114,61 @@ class LocalModels(private val context: Context) {
         return mi.totalMem / 1e9
     }
 
-    fun download(model: CatalogModel): Long {
+    fun download(model: CatalogModel): Long = downloadFile(model.fileName, model.url, model.name)
+
+    fun download(file: HfFile): Long = downloadFile(file.fileName, file.url, file.fileName.removeSuffix(".gguf"))
+
+    private fun downloadFile(fileName: String, url: String, label: String): Long {
         val dm = context.getSystemService(DownloadManager::class.java)
-        val req = DownloadManager.Request(Uri.parse(model.url))
-            .setTitle("D-Agent: ${model.name}")
+        val req = DownloadManager.Request(Uri.parse(url))
+            .setTitle("D-Agent: $label")
             .setDescription("On-phone AI model")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(context, "models", model.fileName + ".part")
+            .setDestinationInExternalFilesDir(context, "models", "$fileName.part")
             .setAllowedOverMetered(true)
         val id = dm.enqueue(req)
-        _downloads.value = _downloads.value + (model.fileName to 0f)
+        _downloads.value = _downloads.value + (fileName to 0f)
         return id
+    }
+
+    // ---- Hugging Face ---------------------------------------------------------------------------
+
+    private val hub = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()
+
+    private fun getJson(url: String): kotlinx.serialization.json.JsonElement {
+        hub.newCall(Request.Builder().url(url).header("User-Agent", "D-Agent").build()).execute().use { r ->
+            if (!r.isSuccessful) throw IOException("Hugging Face said HTTP ${r.code}")
+            return kotlinx.serialization.json.Json.parseToJsonElement(r.body!!.string())
+        }
+    }
+
+    /** GGUF repositories matching [query], most downloaded first. */
+    suspend fun searchHub(query: String): List<HfRepo> = withContext(Dispatchers.IO) {
+        val q = java.net.URLEncoder.encode(query.trim(), "UTF-8")
+        getJson("https://huggingface.co/api/models?search=$q&filter=gguf&sort=downloads&direction=-1&limit=25").let { el ->
+            (el as kotlinx.serialization.json.JsonArray).mapNotNull { item ->
+                val o = item as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+                fun long(k: String) = (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+                val id = (o["id"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: (o["modelId"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return@mapNotNull null
+                HfRepo(id, long("downloads"), long("likes"))
+            }
+        }
+    }
+
+    /** The .gguf files in a repository ("owner/name" or a huggingface.co link), smallest first. */
+    suspend fun hubFiles(repoOrUrl: String): List<HfFile> = withContext(Dispatchers.IO) {
+        val repo = repoOrUrl.trim().removePrefix("https://").removePrefix("http://").removePrefix("huggingface.co/")
+            .split('/').filter { it.isNotBlank() }.take(2).joinToString("/")
+        if (!repo.contains('/')) throw IOException("Use owner/name, like bartowski/Qwen_Qwen3-1.7B-GGUF")
+        val el = getJson("https://huggingface.co/api/models/$repo/tree/main?recursive=true")
+        (el as kotlinx.serialization.json.JsonArray).mapNotNull { item ->
+            val o = item as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+            val path = (o["path"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return@mapNotNull null
+            if (!path.endsWith(".gguf", true) || path.contains("mmproj", true)) return@mapNotNull null
+            val lfs = o["lfs"] as? kotlinx.serialization.json.JsonObject
+            val size = ((lfs?.get("size") ?: o["size"]) as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+            HfFile(repo, path, size)
+        }.sortedBy { it.bytes }
     }
 
     /** Polls the system download manager; call from a coroutine while the screen is open. */

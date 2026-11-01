@@ -23,7 +23,11 @@ import android.os.Vibrator
 import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.ContactsContract
+import android.telecom.PhoneAccountHandle
+import android.telecom.TelecomManager
 import android.telephony.SmsManager
+import android.telephony.SubscriptionInfo
+import android.telephony.SubscriptionManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import dev.dagent.R
@@ -48,6 +52,8 @@ class PhoneActions(
     private val ui: Interactions,
     private val confirmRisky: () -> Boolean,
     private val speak: (String) -> Unit,
+    /** 0 = the phone's default SIM, 1 or 2 = that SIM slot. */
+    private val defaultSim: () -> Int = { 0 },
 ) {
     data class Action(val name: String, val usage: String, val risky: Boolean = false)
 
@@ -63,9 +69,10 @@ class PhoneActions(
         Action("calendar_events", "days (default 7), query (optional): read upcoming events"),
         Action("calendar_add", "title, start (YYYY-MM-DD HH:MM), end (optional), location, notes: add an event", risky = true),
         Action("contacts_search", "query: find people with their numbers and emails"),
-        Action("sms_send", "to (name or number), text: send a text message right away", risky = true),
+        Action("sms_send", "to (name or number), text, sim (optional 1 or 2): send a text message right away", risky = true),
         Action("sms_compose", "to, text: open a text message ready to send"),
-        Action("call", "to (name or number): start a phone call", risky = true),
+        Action("call", "to (name or number), sim (optional 1 or 2): place a phone call", risky = true),
+        Action("sims", "list the SIM cards (slot, carrier, number)"),
         Action("email_compose", "to, subject, body: open an email ready to send"),
         Action("share", "text: open the share sheet with some text"),
         Action("location", "where the phone is (coordinates and address)"),
@@ -111,10 +118,11 @@ class PhoneActions(
         "calendar_events" -> calendarEvents(a["days"]?.toIntOrNull() ?: 7, a["query"].orEmpty())
         "calendar_add" -> calendarAdd(a)
         "contacts_search" -> contacts(need(a, "query")).ifEmpty { listOf("No contacts match \"${a["query"]}\".") }.joinToString("\n")
-        "sms_send" -> smsSend(need(a, "to"), need(a, "text"))
+        "sms_send" -> smsSend(need(a, "to"), need(a, "text"), simSlot(a["sim"]))
         "sms_compose" -> start(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(resolveNumber(a["to"].orEmpty()) ?: a["to"].orEmpty())))
             .putExtra("sms_body", a["text"].orEmpty()), "Opened a text to ${a["to"]}; the person taps Send.")
-        "call" -> call(need(a, "to"))
+        "call" -> call(need(a, "to"), simSlot(a["sim"]))
+        "sims" -> simsText()
         "email_compose" -> start(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + Uri.encode(a["to"].orEmpty())))
             .putExtra(Intent.EXTRA_SUBJECT, a["subject"].orEmpty()).putExtra(Intent.EXTRA_TEXT, a["body"].orEmpty()), "Opened an email draft.")
         "share" -> start(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, need(a, "text")), "Share"), "Opened the share sheet.")
@@ -292,25 +300,79 @@ class PhoneActions(
         return null
     }
 
-    private suspend fun smsSend(to: String, text: String): String {
+    // ---- SIM cards ----------------------------------------------------------------------------
+
+    /** "2", "sim 2", "SIM2" -> 2; anything else falls back to the setting (0 = phone default). */
+    private fun simSlot(arg: String?): Int = arg?.filter { it.isDigit() }?.toIntOrNull()?.takeIf { it in 1..4 } ?: defaultSim()
+
+    @SuppressLint("MissingPermission")
+    private suspend fun activeSims(): List<SubscriptionInfo> {
+        if (!ui.require("to see your SIM cards", Manifest.permission.READ_PHONE_STATE)) return emptyList()
+        val sm = context.getSystemService(SubscriptionManager::class.java) ?: return emptyList()
+        return runCatching { sm.activeSubscriptionInfoList.orEmpty().sortedBy { it.simSlotIndex } }.getOrDefault(emptyList())
+    }
+
+    private suspend fun simsText(): String {
+        val sims = activeSims()
+        if (sims.isEmpty()) return "No SIM cards found (or the phone-state permission was not allowed)."
+        return sims.joinToString("\n") { s ->
+            @Suppress("DEPRECATION") val num = runCatching { s.number }.getOrNull().orEmpty()
+            "SIM ${s.simSlotIndex + 1}: ${s.carrierName ?: s.displayName}${if (num.isNotBlank()) " ($num)" else ""}"
+        } + "\nDefault for calls and texts in D-Agent: " + (if (defaultSim() == 0) "the phone's default" else "SIM ${defaultSim()}")
+    }
+
+    private suspend fun simFor(slot: Int): SubscriptionInfo? =
+        if (slot <= 0) null else activeSims().firstOrNull { it.simSlotIndex == slot - 1 }
+
+    private suspend fun smsSend(to: String, text: String, slot: Int): String {
         if (!ui.require("to send texts", Manifest.permission.SEND_SMS)) return "SMS permission was not allowed. Use sms_compose instead."
         if (!to.any { it.isDigit() }) ui.require("to find the contact", Manifest.permission.READ_CONTACTS)
         val number = resolveNumber(to) ?: return "Couldn't find a number for \"$to\"."
-        val sms = if (Build.VERSION.SDK_INT >= 31) context.getSystemService(SmsManager::class.java) else @Suppress("DEPRECATION") SmsManager.getDefault()
+        val sim = simFor(slot)
+        if (slot > 0 && sim == null) return "There is no SIM $slot in this phone. Use the sims action to see the cards."
+        val sms = when {
+            sim != null && Build.VERSION.SDK_INT >= 31 -> context.getSystemService(SmsManager::class.java).createForSubscriptionId(sim.subscriptionId)
+            sim != null -> @Suppress("DEPRECATION") SmsManager.getSmsManagerForSubscriptionId(sim.subscriptionId)
+            Build.VERSION.SDK_INT >= 31 -> context.getSystemService(SmsManager::class.java)
+            else -> @Suppress("DEPRECATION") SmsManager.getDefault()
+        }
         val parts = sms.divideMessage(text)
         sms.sendMultipartTextMessage(number, null, parts, null, null)
-        return "Text sent to $to ($number)."
+        return "Text sent to $to ($number)" + (if (sim != null) " from SIM $slot." else ".")
     }
 
     @SuppressLint("MissingPermission")
-    private suspend fun call(to: String): String {
+    private suspend fun call(to: String, slot: Int): String {
         if (!to.any { it.isDigit() }) ui.require("to find the contact", Manifest.permission.READ_CONTACTS)
         val number = resolveNumber(to) ?: return "Couldn't find a number for \"$to\"."
         return if (ui.require("to place calls", Manifest.permission.CALL_PHONE)) {
-            start(Intent(Intent.ACTION_CALL, Uri.parse("tel:" + Uri.encode(number))), "Calling $to ($number).")
+            val intent = Intent(Intent.ACTION_CALL, Uri.parse("tel:" + Uri.encode(number)))
+            var via = ""
+            if (slot > 0) {
+                val handle = phoneAccountFor(slot)
+                    ?: return "There is no SIM $slot ready for calls in this phone. Use the sims action to see the cards."
+                intent.putExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
+                // Some phone makers read these instead of the account handle.
+                intent.putExtra("com.android.phone.extra.slot", slot - 1).putExtra("simSlot", slot - 1).putExtra("slot", slot - 1)
+                via = " on SIM $slot"
+            }
+            start(intent, "Calling $to ($number)$via.")
         } else {
             start(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(number))), "Opened the dialer for $number; the person taps Call.")
         }
+    }
+
+    /** The calling account that belongs to SIM [slot], matched by subscription id. */
+    @SuppressLint("MissingPermission")
+    private suspend fun phoneAccountFor(slot: Int): PhoneAccountHandle? {
+        val sim = simFor(slot) ?: return null
+        val tm = context.getSystemService(TelecomManager::class.java) ?: return null
+        val accounts = runCatching { tm.callCapablePhoneAccounts }.getOrDefault(emptyList())
+        val tel = context.getSystemService(android.telephony.TelephonyManager::class.java)
+        return accounts.firstOrNull { h ->
+            val subId = if (Build.VERSION.SDK_INT >= 30) runCatching { tel.getSubscriptionId(h) }.getOrDefault(-1) else -1
+            subId == sim.subscriptionId || h.id == sim.subscriptionId.toString() || h.id == sim.iccId
+        } ?: accounts.getOrNull(slot - 1)
     }
 
     private fun maps(query: String, mode: String): String {

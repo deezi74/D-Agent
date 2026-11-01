@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -224,14 +225,27 @@ fun LocalModelsPage(g: Graph, back: () -> Unit) {
         }
         OutlinedButton({ pickFile.launch(arrayOf("*/*")) }) { Text("Import a .gguf file") }
         Section("Download")
-        g.local.catalog.forEach { m ->
+        val best = remember { g.local.best() }
+        Muted("Tested with ${prefs.persona.name}'s tools. One tap downloads it; you can leave this screen while it runs.")
+        g.local.catalog.sortedByDescending { it.id == best.id }.forEach { m ->
             val have = installed.any { it.name == m.fileName }
             val progress = downloads[m.fileName]
+            val fits = g.local.fits(m)
             Card {
-                Text("${m.name} · ${m.maker}", color = p.text, fontWeight = FontWeight.SemiBold)
-                Text("${"%.1f".format(m.bytes / 1e9)} GB. ${m.note}", color = p.muted, fontSize = 13.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${m.name} · ${m.maker}", color = p.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Text(if (m.id == best.id) "Best for this phone" else m.tag, color = if (m.id == best.id) p.good else p.accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Text("${"%.1f".format(m.bytes / 1e9)} GB · needs ${m.minRamGb} GB RAM. ${m.note}", color = p.muted, fontSize = 13.sp)
+                if (!fits) Text("This phone may not have enough memory for it.", color = p.bad, fontSize = 12.sp)
                 when {
-                    have -> Text("Downloaded", color = p.good, fontSize = 13.sp)
+                    have -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Downloaded", color = p.good, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        TextButton({
+                            g.settings.update { it.copy(localModelFile = m.fileName, providerId = Providers.LOCAL_ID) }
+                            status = "Chat now uses ${m.name} on this phone."
+                        }) { Text("Use it") }
+                    }
                     progress != null && progress >= 0 -> LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = p.accent)
                     else -> Button({ g.local.download(m); status = "Downloading ${m.name}. You can leave this screen." }, colors = ButtonDefaults.buttonColors(containerColor = p.accent)) {
                         Text(if (progress == -1f) "Retry download" else "Download")
@@ -239,7 +253,86 @@ fun LocalModelsPage(g: Graph, back: () -> Unit) {
                 }
             }
         }
+        HubSection(g, installed, downloads) { status = it }
     }
+}
+
+/** Search Hugging Face for any GGUF model and download one of its files. */
+@Composable
+private fun HubSection(g: Graph, installed: List<File>, downloads: Map<String, Float>, say: (String) -> Unit) {
+    val p = LocalPalette.current
+    val scope = rememberCoroutineScope()
+    var query by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    var repos by remember { mutableStateOf(emptyList<dev.dagent.local.HfRepo>()) }
+    var openRepo by remember { mutableStateOf("") }
+    var files by remember { mutableStateOf(emptyList<dev.dagent.local.HfFile>()) }
+    fun listFiles(repo: String) {
+        busy = true; error = ""; openRepo = repo
+        scope.launch {
+            runCatching { g.local.hubFiles(repo) }
+                .onSuccess { files = it; if (it.isEmpty()) error = "No .gguf files in $repo." }
+                .onFailure { error = it.message ?: "Couldn't list files." }
+            busy = false
+        }
+    }
+    Section("Any model from Hugging Face")
+    Muted("Search by name (qwen3, llama, gemma, phi, smollm...) or paste owner/repo. Q4_K_M files of 0.5B to 4B models run well on most phones.")
+    OutlinedTextField(query, { query = it }, label = { Text("Search or owner/repo") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button({
+            busy = true; error = ""; files = emptyList(); openRepo = ""
+            scope.launch {
+                runCatching { g.local.searchHub(query) }
+                    .onSuccess { repos = it; if (it.isEmpty()) error = "Nothing found for \"$query\"." }
+                    .onFailure { error = it.message ?: "Search failed." }
+                busy = false
+            }
+        }, enabled = !busy && query.isNotBlank(), colors = ButtonDefaults.buttonColors(containerColor = p.accent)) { Text("Search") }
+        OutlinedButton({ listFiles(query) }, enabled = !busy && query.contains('/')) { Text("Open repo") }
+    }
+    if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = p.accent)
+    if (error.isNotBlank()) Text(error, color = p.bad, fontSize = 13.sp)
+    if (openRepo.isNotBlank() && files.isNotEmpty()) {
+        Card {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(openRepo, color = p.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                TextButton({ openRepo = ""; files = emptyList() }) { Text("Back") }
+            }
+            files.forEach { f ->
+                val have = installed.any { it.name == f.fileName }
+                val progress = downloads[f.fileName]
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(f.fileName, color = p.text, fontSize = 13.sp, fontFamily = Mono)
+                        Text(if (f.bytes > 0) "${"%.2f".format(f.bytes / 1e9)} GB" else "size unknown", color = p.muted, fontSize = 12.sp)
+                    }
+                    when {
+                        have -> Text("Downloaded", color = p.good, fontSize = 12.sp)
+                        progress != null && progress >= 0 -> Text("${(progress * 100).toInt()}%", color = p.accent, fontSize = 12.sp)
+                        else -> TextButton({ g.local.download(f); say("Downloading ${f.fileName}.") }) { Text("Download") }
+                    }
+                }
+            }
+        }
+    } else {
+        repos.forEach { r ->
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.surface).clickable { listFiles(r.id) }.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(r.id, color = p.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Text("${compact(r.downloads)} downloads", color = p.muted, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+private fun compact(n: Long): String = when {
+    n >= 1_000_000 -> "%.1fM".format(n / 1e6)
+    n >= 1_000 -> "%.1fK".format(n / 1e3)
+    else -> n.toString()
 }
 
 // ---- Persona ---------------------------------------------------------------------------------
@@ -264,20 +357,23 @@ fun PersonaPage(g: Graph, back: () -> Unit) {
                     f.absolutePath
                 }.getOrNull()
             }
-            if (path != null) g.settings.update { it.copy(avatarPath = path) }
+            if (path != null) { g.settings.update { it.copy(avatarPath = path) }; g.character.clear() }
         }
     }
     fun save() = g.settings.update {
         it.copy(persona = it.persona.copy(name = name.ifBlank { "D" }, customStyle = custom, userName = user, aboutUser = about))
     }
     Page("Look and personality", { save(); back() }) {
+        val look by g.character.active.collectAsState()
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            AgentAvatar(name, prefs.avatarPath, 88.dp)
+            AgentAvatar(name, prefs.avatarPath, 88.dp, look = look)
             Column(Modifier.padding(start = 16.dp)) {
                 Button({ pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, colors = ButtonDefaults.buttonColors(containerColor = p.accent)) { Text("Choose picture") }
-                if (prefs.avatarPath.isNotBlank()) TextButton({ g.settings.update { it.copy(avatarPath = "") } }) { Text("Use the monogram") }
+                if (look != null) TextButton({ g.character.clear() }) { Text("Stop using the character") }
+                else if (prefs.avatarPath.isNotBlank()) TextButton({ g.settings.update { it.copy(avatarPath = "") } }) { Text("Use the monogram") }
             }
         }
+        CharacterStudioCard(g)
         OutlinedTextField(name, { name = it.take(24) }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Section("Personality")
         listOf(
@@ -307,6 +403,90 @@ fun PersonaPage(g: Graph, back: () -> Unit) {
             }
         }
         Button({ save(); back() }, colors = ButtonDefaults.buttonColors(containerColor = p.accent), modifier = Modifier.fillMaxWidth()) { Text("Save") }
+    }
+}
+
+@Composable
+private fun CharacterStudioCard(g: Graph) {
+    val p = LocalPalette.current
+    val scope = rememberCoroutineScope()
+    val look by g.character.active.collectAsState()
+    val slots by g.character.slots.collectAsState()
+    val posing by g.character.posing.collectAsState()
+    var description by remember { mutableStateOf("") }
+    var style by remember { mutableStateOf(dev.dagent.character.CharacterStudio.STYLES.first().id) }
+    var error by remember { mutableStateOf("") }
+    var saved by remember(look) { mutableStateOf(g.character.saved()) }
+    Section("Character")
+    Card {
+        Muted("Describe a character and pick one of four. It gets a pose for each mood, so its face in the chat changes while it works, waits on you, finishes or slips up. You can also just say \"make yourself a robot fox\" in the chat.")
+        OutlinedTextField(description, { description = it }, label = { Text("Who is it? (e.g. a chill astronaut cat in an orange suit)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            dev.dagent.character.CharacterStudio.STYLES.forEach { st ->
+                val on = st.id == style
+                Text(
+                    st.label, color = if (on) Color(0xFF1A0E08) else p.text, fontSize = 13.sp,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) p.accent else p.bg).clickable { style = st.id }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                )
+            }
+        }
+        Button(
+            { error = ""; g.character.makeOptions(description, style) },
+            enabled = description.isNotBlank() && slots.none { it is dev.dagent.character.CharacterStudio.Slot.Loading },
+            colors = ButtonDefaults.buttonColors(containerColor = p.accent),
+        ) { Text(if (slots.isEmpty()) "Make 4 options" else "Make 4 more") }
+        if (slots.isNotEmpty()) {
+            slots.chunked(2).forEachIndexed { row, pair ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    pair.forEachIndexed { col, slot ->
+                        val index = row * 2 + col
+                        Box(
+                            Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(14.dp)).background(p.bg)
+                                .clickable(enabled = slot is dev.dagent.character.CharacterStudio.Slot.Ready) {
+                                    scope.launch { runCatching { g.character.pick(index) }.onFailure { error = it.message ?: "Couldn't use it" } }
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            when (slot) {
+                                is dev.dagent.character.CharacterStudio.Slot.Ready -> coil.compose.AsyncImage(
+                                    model = slot.file, contentDescription = "Option ${index + 1}",
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.matchParentSize(),
+                                )
+                                is dev.dagent.character.CharacterStudio.Slot.Failed -> Text(slot.message, color = p.bad, fontSize = 11.sp, modifier = Modifier.padding(8.dp))
+                                else -> androidx.compose.material3.CircularProgressIndicator(color = p.accent, modifier = Modifier.size(28.dp))
+                            }
+                        }
+                    }
+                }
+            }
+            Muted("Tap the one you like.")
+        }
+        if (error.isNotBlank()) Text(error, color = p.bad, fontSize = 13.sp)
+        look?.let { l ->
+            Text("In use: ${l.description}", color = p.text, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                dev.dagent.character.Mood.entries.forEach { m ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        AgentAvatar("", "", 52.dp, look = l, mood = m)
+                        Text(m.label, color = p.muted, fontSize = 10.sp)
+                    }
+                }
+            }
+            if (posing.isNotBlank()) Muted(posing)
+            else if (l.posed() < dev.dagent.character.Mood.entries.size) TextButton({ g.character.redoMissingMoods() }) { Text("Draw the missing moods") }
+        }
+        if (saved.size > 1 || (saved.isNotEmpty() && look == null)) {
+            Text("Saved characters", color = p.muted, fontSize = 12.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                saved.forEach { s ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        AgentAvatar("", "", 56.dp, look = s, modifier = Modifier.clickable { g.character.use(s) })
+                        Text("Delete", color = p.bad, fontSize = 10.sp, modifier = Modifier.clickable { g.character.delete(s); saved = g.character.saved() })
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -414,6 +594,16 @@ fun ToolsPage(g: Graph, back: () -> Unit) {
             ToggleRow("Read replies aloud", "Speak every answer with the phone's voice", prefs.readAloud) { v -> g.settings.update { it.copy(readAloud = v) } }
             ToggleRow("Ask before texts, calls and calendar changes", "Recommended", prefs.confirmRisky) { v -> g.settings.update { it.copy(confirmRisky = v) } }
             ToggleRow("Think before answering", "Slower, better on hard questions (models that support it)", prefs.think) { v -> g.settings.update { it.copy(think = v) } }
+        }
+        Section("Calls and texts")
+        Card {
+            Muted("${prefs.persona.name} places calls and sends texts itself (after asking, if that's on). Pick which SIM it uses; you can also say \"call Mom on SIM 2\".")
+            listOf(0 to "Phone's default SIM", 1 to "SIM 1", 2 to "SIM 2").forEach { (v, label) ->
+                Row(Modifier.fillMaxWidth().clickable { g.settings.update { it.copy(defaultSim = v) } }, verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(prefs.defaultSim == v, { g.settings.update { it.copy(defaultSim = v) } })
+                    Text(label, color = p.text)
+                }
+            }
         }
         Section("Vision")
         Card {

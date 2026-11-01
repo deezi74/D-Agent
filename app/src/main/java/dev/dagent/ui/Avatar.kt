@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -28,14 +29,24 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import dev.dagent.character.CharacterLook
+import dev.dagent.character.Mood
 import java.io.File
 
 /**
- * The agent's face: the person's own picture if they chose one, otherwise a monogram on an
- * ember gradient. While the agent works a ring spins around it.
+ * The agent's face: the character the person made (posed for the current mood), else their own
+ * picture, else a monogram on an ember gradient. While the agent works a ring spins around it.
  */
 @Composable
-fun AgentAvatar(name: String, path: String, size: Dp, busy: Boolean = false, modifier: Modifier = Modifier) {
+fun AgentAvatar(
+    name: String,
+    path: String,
+    size: Dp,
+    busy: Boolean = false,
+    modifier: Modifier = Modifier,
+    look: CharacterLook? = null,
+    mood: Mood = if (busy) Mood.WORKING else Mood.IDLE,
+) {
     val p = LocalPalette.current
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         if (busy) {
@@ -51,7 +62,17 @@ fun AgentAvatar(name: String, path: String, size: Dp, busy: Boolean = false, mod
         }
         val inner = if (busy) size * 0.82f else size
         val file = path.takeIf { it.isNotBlank() }?.let { File(it) }?.takeIf { it.isFile }
-        if (file != null) {
+        val face = look?.forMood(mood)?.takeIf { it.isFile }
+        if (face != null) {
+            // A small idle bob, quicker while working, so the character feels alive.
+            val t = rememberInfiniteTransition(label = "bob")
+            val speed = when (mood) { Mood.WORKING -> 700; Mood.HAPPY -> 450; else -> 1800 }
+            val bob by t.animateFloat(-1f, 1f, infiniteRepeatable(tween(speed), RepeatMode.Reverse), label = "y")
+            AsyncImage(
+                model = face, contentDescription = "$name, ${mood.label.lowercase()}", contentScale = ContentScale.Crop,
+                modifier = Modifier.size(inner).offset(y = inner * 0.025f * bob).clip(CircleShape),
+            )
+        } else if (file != null) {
             AsyncImage(
                 model = file, contentDescription = name, contentScale = ContentScale.Crop,
                 modifier = Modifier.size(inner).clip(CircleShape),
