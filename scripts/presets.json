@@ -1,0 +1,18 @@
+{
+  "style": "cute 3D collectible vinyl toy figure, soft matte materials with a gentle sheen, rounded chunky proportions, big glossy friendly eyes, soft studio lighting, subtle shadow, full body standing, centered, plain white background, no text, no watermark",
+  "moods": {
+    "idle": "standing relaxed with a gentle smile, looking at the viewer",
+    "working": "focused and determined, holding a tiny glowing tablet and tapping it",
+    "happy": "jumping with joy, arms up, huge happy smile, eyes closed in delight",
+    "waiting": "head tilted with a curious look, one paw raised as if asking a question",
+    "error": "sheepish and apologetic, scratching head, awkward smile, small sweat drop"
+  },
+  "characters": [
+    {"id": "sparky", "name": "Sparky", "seed": 41027, "look": "a chubby little orange fox kit with a cream belly, a fluffy tail whose tip glows like a warm ember, tiny gold scarf"},
+    {"id": "bolt", "name": "Bolt", "seed": 58213, "look": "a small round teal robot with a dark glass visor face showing two bright cyan dot eyes, a springy antenna with a yellow ball, stubby arms"},
+    {"id": "pip", "name": "Pip", "seed": 77104, "look": "a plump cream and caramel hamster astronaut in a white space suit with an orange stripe, clear bubble helmet pushed back"},
+    {"id": "nimbus", "name": "Nimbus", "seed": 23988, "look": "a fluffy white cloud lamb with a soft lilac face, tiny curled horns, and a striped rainbow knit scarf"},
+    {"id": "gizmo", "name": "Gizmo", "seed": 64551, "look": "a little lime green frog in a shiny yellow raincoat with brass goggles on its forehead"},
+    {"id": "juno", "name": "Juno", "seed": 90317, "look": "a mint green baby sea turtle with a coral pink shell pattern, wearing small white headphones and a tiny navy backpack"}
+  ]
+}

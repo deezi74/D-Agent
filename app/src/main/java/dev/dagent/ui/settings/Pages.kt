@@ -420,6 +420,27 @@ private fun CharacterStudioCard(g: Graph) {
     Section("Character")
     Card {
         Muted("Describe a character and pick one of four. It gets a pose for each mood, so its face in the chat changes while it works, waits on you, finishes or slips up. You can also just say \"make yourself a robot fox\" in the chat.")
+        if (g.character.presets.isNotEmpty()) {
+            Text("Ready-made characters", color = p.muted, fontSize = 12.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                g.character.presets.forEach { pr ->
+                    val on = look?.id == "preset-${pr.id}"
+                    Column(
+                        Modifier.clip(RoundedCornerShape(14.dp)).background(if (on) p.accent.copy(alpha = 0.25f) else p.bg)
+                            .clickable { scope.launch { runCatching { g.character.usePreset(pr) }.onFailure { error = it.message ?: "Couldn't use it" } } }
+                            .padding(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        coil.compose.AsyncImage(
+                            model = "file:///android_asset/" + pr.asset(dev.dagent.character.Mood.IDLE), contentDescription = pr.name,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.size(72.dp).clip(CircleShape),
+                        )
+                        Text(pr.name, color = p.text, fontSize = 12.sp)
+                    }
+                }
+            }
+            Text("Or make your own", color = p.muted, fontSize = 12.sp)
+        }
         OutlinedTextField(description, { description = it }, label = { Text("Who is it? (e.g. a chill astronaut cat in an orange suit)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             dev.dagent.character.CharacterStudio.STYLES.forEach { st ->

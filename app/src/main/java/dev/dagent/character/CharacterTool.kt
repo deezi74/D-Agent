@@ -12,11 +12,12 @@ class CharacterTool(private val studio: CharacterStudio) : Tool {
     override val name = "character"
     override val description = "Change your own avatar (your face in the app). " +
         "create: draw 4 options of a character from a description in a style, shown to the person; then ask which one they like. " +
-        "pick: adopt option 1-4 (you then get a pose for each mood). saved: list saved characters. use: switch to a saved one by number. " +
+        "pick: adopt option 1-4 (you then get a pose for each mood). preset: become a built-in character by name (Sparky, Bolt, Pip, Nimbus, Gizmo, Juno). saved: list saved characters. use: switch to a saved one by number. " +
         "clear: go back to the photo or monogram. Styles: " + CharacterStudio.STYLES.joinToString(", ") { it.id }
     override val parameters = schema {
         title()
-        string("action", "create, pick, saved, use or clear.", required = true, enum = listOf("create", "pick", "saved", "use", "clear"))
+        string("action", "create, pick, saved, use or clear.", required = true, enum = listOf("create", "pick", "preset", "saved", "use", "clear"))
+        string("name", "preset: the built-in character's name.")
         string("description", "create: who the character is (species, look, outfit, colors, vibe), in English.")
         string("style", "create: art style id.", enum = CharacterStudio.STYLES.map { it.id })
         integer("option", "pick: 1-4. use: number from saved.")
@@ -42,6 +43,13 @@ class CharacterTool(private val studio: CharacterStudio) : Tool {
                 { ToolResult.ok("Now using option $n as your face. Mood poses (working, done, waiting, oops) are being drawn in the background.") },
                 { ToolResult.error(it.message ?: "Couldn't use that option.") },
             )
+        }
+        "preset" -> {
+            val want = args.string("name").orEmpty()
+            val pr = studio.presets.firstOrNull { it.name.equals(want, true) || it.id.equals(want, true) }
+                ?: return ToolResult.error("Built-in characters: " + studio.presets.joinToString { it.name })
+            studio.usePreset(pr)
+            ToolResult.ok("You are now ${pr.name} (${pr.look}).")
         }
         "saved" -> {
             val list = studio.saved()

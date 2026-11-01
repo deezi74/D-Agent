@@ -62,7 +62,7 @@ data class CharacterLook(
  * which keeps the same character across moods by editing the picked picture.
  */
 class CharacterStudio(
-    context: Context,
+    private val context: Context,
     http: OkHttpClient,
     private val optionsDir: File,
     private val pollinationsKey: () -> String,
@@ -176,6 +176,40 @@ class CharacterStudio(
         val look = _active.value ?: return
         val seed = runCatching { json.decodeFromString<Meta>(File(look.dir, "meta.json").readText()).seed }.getOrDefault(42)
         pose(look, seed)
+    }
+
+    // ---- built-in characters --------------------------------------------------------------------
+
+    data class Preset(val id: String, val name: String, val look: String) {
+        /** Asset path of this character's picture for [mood]. */
+        fun asset(m: Mood) = "characters/$id/${m.name.lowercase()}.webp"
+    }
+
+    /** The ready-made characters shipped in the app (assets/characters). */
+    val presets: List<Preset> by lazy {
+        runCatching {
+            val arr = Json.parseToJsonElement(context.assets.open("characters/index.json").bufferedReader().readText()) as kotlinx.serialization.json.JsonArray
+            arr.mapNotNull { el ->
+                val o = el as? JsonObject ?: return@mapNotNull null
+                fun str(k: String) = (o[k] as? JsonPrimitive)?.content.orEmpty()
+                Preset(str("id"), str("name"), str("look")).takeIf { p -> runCatching { context.assets.open(p.asset(Mood.IDLE)).close() }.isSuccess }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    /** Uses a built-in character: copies its five mood pictures into a saved character. */
+    suspend fun usePreset(preset: Preset): CharacterLook = withContext(Dispatchers.IO) {
+        saved().firstOrNull { it.id == "preset-${preset.id}" }?.let { if (it.posed() == Mood.entries.size) { activate(it); return@withContext it } }
+        val id = "preset-${preset.id}"
+        val dir = File(looksDir, id).apply { mkdirs() }
+        val look = CharacterLook(id, "${preset.name}, ${preset.look}", "toy", dir)
+        Mood.entries.forEach { m ->
+            runCatching { context.assets.open(preset.asset(m)).use { input -> look.moodFile(m).outputStream().use { input.copyTo(it) } } }
+        }
+        look.moodFile(Mood.IDLE).copyTo(look.base, overwrite = true)
+        File(dir, "meta.json").writeText(json.encodeToString(Meta(id, look.description, "toy", 7)))
+        activate(look)
+        look
     }
 
     // ---- saved characters -----------------------------------------------------------------------
