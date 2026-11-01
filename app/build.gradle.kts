@@ -68,7 +68,10 @@ android {
         // Programs shipped as lib*.so must be extracted to disk so they can be executed.
         jniLibs { useLegacyPackaging = true }
         resources {
-            excludes += listOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/INDEX.LIST", "/META-INF/DEPENDENCIES")
+            excludes += listOf(
+                "/META-INF/{AL2.0,LGPL2.1}", "/META-INF/INDEX.LIST", "/META-INF/DEPENDENCIES",
+                "/META-INF/LICENSE.md", "/META-INF/NOTICE.md", "/META-INF/LICENSE.txt", "/META-INF/NOTICE.txt", "/META-INF/LICENSE", "/META-INF/NOTICE",
+            )
         }
     }
 }
@@ -95,4 +98,6 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+    implementation(libs.android.mail)
+    implementation(libs.android.activation)
 }

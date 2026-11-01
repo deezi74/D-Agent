@@ -14,6 +14,7 @@ jsoup = "1.18.3"
 junit = "4.13.2"
 coil = "2.7.0"
 camerax = "1.4.1"
+javamail = "1.6.7"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -39,6 +40,8 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+android-mail = { group = "com.sun.mail", name = "android-mail", version.ref = "javamail" }
+android-activation = { group = "com.sun.mail", name = "android-activation", version.ref = "javamail" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }

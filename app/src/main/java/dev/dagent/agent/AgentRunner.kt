@@ -11,6 +11,13 @@ import dev.dagent.Graph
 import dev.dagent.R
 import dev.dagent.browser.BrowserTool
 import dev.dagent.character.CharacterTool
+import dev.dagent.connectors.EmailTool
+import dev.dagent.connectors.TermuxTool
+import dev.dagent.core.places.GeoPoint
+import dev.dagent.core.tools.GitHubClient
+import dev.dagent.core.tools.GitHubTool
+import dev.dagent.core.tools.PlacesTool
+import dev.dagent.core.tools.WeatherTool
 import dev.dagent.core.agent.AgentEvent
 import dev.dagent.core.agent.AgentLoop
 import dev.dagent.core.agent.AgentOptions
@@ -262,6 +269,10 @@ class AgentRunner(private val g: Graph) {
         }
     }
 
+    private val locate: suspend () -> GeoPoint? = {
+        runCatching { g.phone.currentLocation(ask = g.interactions.uiVisible)?.let { GeoPoint(it.latitude, it.longitude) } }.getOrNull()
+    }
+
     private fun tools(agentMode: Boolean, vision: Boolean): List<Tool> {
         val ws = g.workspace
         val quick = listOf<Tool>(
@@ -269,11 +280,18 @@ class AgentRunner(private val g: Graph) {
             WebFetchTool(g.http),
             ImageTool(g.http, ws, { g.settings.secret(Settings.POLLINATIONS_KEY) }) { g.settings.provider("openai").apiKey to g.settings.provider("openrouter").apiKey },
             CharacterTool(g.character),
+            WeatherTool(g.places, locate),
+            PlacesTool(g.places, locate),
             RememberTool(g.memory),
             RecallTool(g.memory),
         )
-        if (!agentMode) return quick
-        return quick + listOf(
+        val connected = buildList<Tool> {
+            if (g.connectors.emailAccounts.isNotEmpty()) add(EmailTool(g.email) { g.connectors.emailOrganize })
+            if (g.connectors.githubToken.isNotBlank()) add(GitHubTool(GitHubClient({ g.connectors.githubToken }, http = g.http)) { g.connectors.githubWrite })
+            if (g.connectors.termuxOn) add(TermuxTool(g.termux) { g.connectors.termuxOn })
+        }
+        if (!agentMode) return quick + connected
+        return quick + connected + listOf(
             ForgetTool(g.memory),
             PlanTool(plan),
             ShellTool(g.linux),
@@ -313,6 +331,43 @@ class AgentRunner(private val g: Graph) {
         g.chats.save(session)
         notifyDone(final.ifBlank { "Finished." }, label)
         return final
+    }
+
+    data class RemoteReply(val sessionId: String, val text: String, val files: List<File>)
+
+    /**
+     * Answers a message that came from outside the app (the Telegram bot), keeping the talk in
+     * its own saved chat so it has the history. Risky phone actions are refused while the app
+     * is not on screen, as everywhere else.
+     */
+    suspend fun runRemote(sessionId: String?, title: String, prompt: String, images: List<ImagePart>, note: String): RemoteReply {
+        val provider = g.settings.provider()
+        val prefs = g.settings.current
+        if (provider.id == Providers.LOCAL_ID) {
+            val file = g.local.installed().firstOrNull { it.name == prefs.localModelFile } ?: g.local.installed().first()
+            g.local.ensureRunning(file, prefs.localContext, prefs.localThreads)
+        }
+        val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
+        val tools = tools(agentMode = prefs.agentMode, vision = images.isNotEmpty()).filterNot { it.name == "plan" }
+        val system = PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = g.linux.installed, agentMode = prefs.agentMode), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
+            "\n\n" + note
+        var session = sessionId?.let { g.chats.load(it) } ?: ChatSession(title = title)
+        session = session.copy(messages = (session.messages + Msg.user(prompt, images)).takeLast(60), updated = System.currentTimeMillis())
+        var final = ""
+        val files = ArrayList<File>()
+        val ctx = object : ToolContext { override val sessionId = session.id }
+        AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = 25)).run(system, session.messages, ctx).collect { ev ->
+            when (ev) {
+                is AgentEvent.Message -> {
+                    session = session.copy(messages = session.messages + ev.msg, updated = System.currentTimeMillis())
+                    if (ev.msg.role == Role.ASSISTANT && ev.msg.toolCalls.isEmpty()) final = ev.msg.text
+                }
+                is AgentEvent.ToolEnd -> files += ev.result.files
+                else -> Unit
+            }
+        }
+        g.chats.save(session)
+        return RemoteReply(session.id, final, files)
     }
 
     private fun notifyDone(text: String, title: String? = null) {

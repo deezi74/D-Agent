@@ -9,7 +9,12 @@ import dev.dagent.core.agent.MemoryStore
 import dev.dagent.core.agent.SkillLibrary
 import dev.dagent.core.tools.WebSearch
 import dev.dagent.core.tools.Workspace
+import dev.dagent.connectors.EmailClient
+import dev.dagent.connectors.TelegramBot
+import dev.dagent.connectors.TermuxBridge
+import dev.dagent.core.places.PlacesClient
 import dev.dagent.data.ChatStore
+import dev.dagent.data.Connectors
 import dev.dagent.data.Settings
 import dev.dagent.linux.LinuxComputer
 import dev.dagent.linux.PhoneBridge
@@ -32,6 +37,7 @@ class DAgentApp : Application() {
         graph = Graph(this)
         PhoneActions.ensureChannel(this)
         BuiltinSkills.install(this, graph.skills)
+        if (graph.telegram.enabled) runCatching { graph.telegram.start() }
     }
 }
 
@@ -64,5 +70,10 @@ class Graph(val context: Context) {
         pollinationsKey = { settings.secret(Settings.POLLINATIONS_KEY) },
         openAi = { settings.provider("openai").takeIf { it.apiKey.isNotBlank() }?.let { it.baseUrl to it.apiKey } },
     )
+    val connectors = Connectors(context, settings)
+    val places = PlacesClient(googleKey = { connectors.googlePlacesKey.ifBlank { null } }, http = http)
+    val email = EmailClient { connectors.emailAccounts }
+    val termux = TermuxBridge(context)
     val runner = AgentRunner(this)
+    val telegram = TelegramBot(this)
 }

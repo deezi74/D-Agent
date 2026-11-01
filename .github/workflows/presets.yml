@@ -28,6 +28,12 @@ jobs:
           POLLINATIONS_KEY: ${{ secrets.POLLINATIONS_KEY }}
         run: |
           if [ -n "${{ github.event.inputs.only }}" ]; then python3 scripts/gen-presets.py --force ${{ github.event.inputs.only }}; else python3 scripts/gen-presets.py; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: characters
+          path: app/src/main/assets/characters
+          if-no-files-found: ignore
       - name: Commit pictures
         run: |
           git config user.name "github-actions[bot]"
@@ -35,4 +41,5 @@ jobs:
           git add app/src/main/assets/characters
           git diff --cached --quiet && exit 0
           git commit -m "Draw built-in character pictures"
-          git push
+          for i in 1 2 3 4; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0; sleep 5; done
+          exit 1
