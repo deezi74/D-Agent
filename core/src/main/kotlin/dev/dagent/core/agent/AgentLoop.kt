@@ -107,8 +107,12 @@ class AgentLoop(
                     emit(AgentEvent.Notice("This model does not take tools natively, so D-Agent is describing them in the prompt instead."))
                     return null
                 }
-                val retryable = e.status == 429 || e.status >= 500 || e.status == 0 && e.message.orEmpty().startsWith("Network")
-                if (!retryable || attempt >= 2) throw e
+                val msg = e.message.orEmpty()
+                val stalled = e.status == 0 && (msg.contains("timeout", true) || msg.contains("timed out", true))
+                val refused = e.status == 0 && (msg.contains("refused", true) || msg.contains("failed to connect", true))
+                val retryable = e.status == 429 || e.status >= 500 || e.status == 0 && msg.startsWith("Network") && !refused
+                // A stalled model gets one more try, not two: each try can take the full idle limit.
+                if (!retryable || attempt >= (if (stalled) 1 else 2)) throw e
                 attempt++
                 emit(AgentEvent.Notice("The provider hiccuped (${e.status.takeIf { it > 0 } ?: "network"}). Retrying..."))
                 delay(1500L * attempt * attempt)

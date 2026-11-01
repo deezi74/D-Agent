@@ -87,6 +87,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -127,6 +128,12 @@ private val IMAGE_EXT = setOf("png", "jpg", "jpeg", "webp", "gif")
 fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings: (String) -> Unit, openVoice: () -> Unit = {}, openDiscover: () -> Unit = {}) {
     val p = LocalPalette.current
     val state by g.runner.state.collectAsState()
+    // Seconds since the reply started, so a slow model visibly isn't frozen.
+    var waited by remember { mutableIntStateOf(0) }
+    LaunchedEffect(state.running) {
+        waited = 0
+        while (state.running) { kotlinx.coroutines.delay(1_000); waited++ }
+    }
     val prefs by g.settings.state.collectAsState()
     g.settings.providersVersion.collectAsState().value
     val provider = g.settings.provider(prefs.providerId)
@@ -178,7 +185,7 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
                 Column(Modifier.weight(1f).padding(start = 10.dp).clickable { showModels = true }) {
                     Text(prefs.persona.name, color = p.text, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     Text(
-                        if (state.running) (state.live.values.lastOrNull { it.running }?.title ?: "Thinking...") else "${provider.preset.name} · ${provider.model}",
+                        if (state.running) (state.live.values.lastOrNull { it.running }?.title ?: "Thinking...") + (if (waited >= 5) " · ${waited}s" else "") else "${provider.preset.name} · ${provider.model}",
                         color = if (state.running) p.accent else p.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }

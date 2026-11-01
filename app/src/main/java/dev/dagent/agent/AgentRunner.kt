@@ -1,5 +1,6 @@
 package dev.dagent.agent
 
+import kotlinx.coroutines.delay
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -193,6 +194,7 @@ class AgentRunner(private val g: Graph) {
                 g.local.ensureRunning(file, prefs.localContext, prefs.localThreads)
                 _state.update { it.copy(notice = "") }
             }
+            if (!isLocal) ensureServerUp(provider.baseUrl)
             val client: LlmClient = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
             val vision = when (prefs.visionOverride) {
                 1 -> true
@@ -236,8 +238,34 @@ class AgentRunner(private val g: Graph) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            _state.update { it.copy(error = e.message ?: e::class.simpleName.orEmpty()) }
+            val msg = e.message ?: e::class.simpleName.orEmpty()
+            _state.update { it.copy(error = if (msg.startsWith("Network")) Providers.explainNetwork(msg, provider.baseUrl) else msg) }
         }
+    }
+
+    /**
+     * For a server on this phone (FreeLLMAPI, Ollama...): checks the port answers. FreeLLMAPI is
+     * started in Termux automatically when the Termux connector is set up, since Android often
+     * stops it in the background.
+     */
+    private suspend fun ensureServerUp(baseUrl: String) {
+        val uri = runCatching { java.net.URI(baseUrl) }.getOrNull() ?: return
+        val host = uri.host ?: return
+        if (host != "localhost" && host != "127.0.0.1") return
+        val port = if (uri.port > 0) uri.port else 80
+        fun open() = runCatching { java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 400) }; true }.getOrDefault(false)
+        if (withContext(Dispatchers.IO) { open() }) return
+        val canStart = port == 3001 && g.termux.isInstalled() && g.termux.hasPermission()
+        if (!canStart) throw IllegalStateException(Providers.explainNetwork("failed to connect", baseUrl))
+        _state.update { it.copy(notice = "Starting FreeLLMAPI in Termux...") }
+        TermuxTool(g.termux) { true }.startJob(dev.dagent.connectors.TermuxTool.FREELLMAPI_SCRIPT)
+        val deadline = System.currentTimeMillis() + 60_000
+        while (System.currentTimeMillis() < deadline) {
+            delay(2_000)
+            if (withContext(Dispatchers.IO) { open() }) { _state.update { it.copy(notice = "") }; return }
+        }
+        _state.update { it.copy(notice = "") }
+        throw IllegalStateException("Tried to start FreeLLMAPI in Termux but it didn't come up within a minute. Open Termux to see what it says.")
     }
 
     private fun handle(ev: AgentEvent, onFinal: (String) -> Unit) {

@@ -89,8 +89,31 @@ object Providers {
         apiKey: String,
         reasoning: ReasoningStyle = ReasoningStyle.NONE,
         headers: Map<String, String> = emptyMap(),
-    ): LlmClient = when (kind) {
-        ApiKind.OPENAI -> OpenAiClient(http, baseUrl, apiKey, headers, reasoning)
-        ApiKind.ANTHROPIC -> AnthropicClient(http, baseUrl, apiKey)
+    ): LlmClient {
+        // A cloud model that goes quiet for 90 s is stuck; fail and retry instead of spinning for
+        // minutes. The phone's own model gets longer, since reading a big prompt on the CPU is slow.
+        val onPhone = baseUrl.contains("127.0.0.1:$LOCAL_PORT")
+        val h = http.newBuilder().readTimeout(if (onPhone) 600L else 90L, java.util.concurrent.TimeUnit.SECONDS).build()
+        return when (kind) {
+            ApiKind.OPENAI -> OpenAiClient(h, baseUrl, apiKey, headers, reasoning)
+            ApiKind.ANTHROPIC -> AnthropicClient(h, baseUrl, apiKey)
+        }
+    }
+
+    /** Plain words for a network failure, with what to try next. */
+    fun explainNetwork(message: String, baseUrl: String): String {
+        val m = message.lowercase()
+        val local = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
+        return when {
+            m.contains("timeout") || m.contains("timed out") ->
+                "The model stopped answering (no reply for a while, even after a retry). " +
+                    (if (local) "If you use FreeLLMAPI, check it's still running in Termux; Android sometimes stops it in the background. " else "") +
+                    "Try again, switch to Chat mode for a lighter request, or pick another model."
+            local && (m.contains("failed to connect") || m.contains("refused")) ->
+                if (baseUrl.contains(":3001")) "FreeLLMAPI isn't running. Start it in Termux: cd ~/freellmapi && termux-wake-lock && npm run dev (or turn on the Termux connector and D-Agent starts it for you)."
+                else "Nothing is answering at $baseUrl. Start that server, or pick another provider."
+            m.contains("unable to resolve host") || m.contains("no address") -> "No internet connection right now."
+            else -> message
+        }
     }
 }
