@@ -22,6 +22,11 @@ class Connectors(context: Context, private val settings: Settings) {
         get() = prefs.getBoolean("termux.on", false)
         set(v) { prefs.edit().putBoolean("termux.on", v).apply() }
 
+    /** Repos the app builder created; it only ever writes to these. */
+    var builtApps: Set<String>
+        get() = prefs.getStringSet("apps.built", emptySet())!!.toSet()
+        set(v) { prefs.edit().putStringSet("apps.built", v).apply() }
+
     var githubToken: String
         get() = settings.secret("github")
         set(v) = settings.setSecret("github", v)

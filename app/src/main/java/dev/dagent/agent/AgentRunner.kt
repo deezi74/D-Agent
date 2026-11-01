@@ -17,6 +17,8 @@ import dev.dagent.connectors.TermuxTool
 import dev.dagent.core.places.GeoPoint
 import dev.dagent.core.tools.GitHubClient
 import dev.dagent.core.tools.GitHubTool
+import dev.dagent.core.tools.AppBuilderTool
+import dev.dagent.core.tools.PhoneBuilder
 import dev.dagent.core.tools.PlacesTool
 import dev.dagent.core.tools.WeatherTool
 import dev.dagent.core.agent.AgentEvent
@@ -289,8 +291,16 @@ class AgentRunner(private val g: Graph) {
         )
         val connected = buildList<Tool> {
             if (g.connectors.emailAccounts.isNotEmpty()) add(EmailTool(g.email) { g.connectors.emailOrganize })
-            if (g.connectors.githubToken.isNotBlank()) add(GitHubTool(GitHubClient({ g.connectors.githubToken }, http = g.http)) { g.connectors.githubWrite })
-            if (g.connectors.termuxOn) add(TermuxTool(g.termux) { g.connectors.termuxOn })
+            val termuxTool = if (g.connectors.termuxOn) TermuxTool(g.termux) { g.connectors.termuxOn } else null
+            if (g.connectors.githubToken.isNotBlank()) {
+                val gh = GitHubClient({ g.connectors.githubToken }, http = g.http)
+                add(GitHubTool(gh) { g.connectors.githubWrite })
+                add(AppBuilderTool(
+                    gh, { g.connectors.builtApps }, { g.connectors.builtApps = g.connectors.builtApps + it }, { g.connectors.githubToken },
+                    phone = termuxTool?.let { t -> PhoneBuilder { script -> t.startJob(script).text } },
+                ))
+            }
+            if (termuxTool != null) add(termuxTool)
         }
         if (!agentMode) return quick + connected
         return quick + connected + listOf(

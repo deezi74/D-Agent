@@ -8,6 +8,7 @@
     "error": "sheepish and apologetic, scratching head, awkward smile, small sweat drop"
   },
   "characters": [
+    {"id": "lumi", "name": "Lumi", "seed": 31415, "look": "a chubby little lavender purple baby dragon with a big cream white belly, two small rounded indigo horns, rosy pink cheeks, tiny indigo bat wings and a short curled tail"},
     {"id": "sparky", "name": "Sparky", "seed": 41027, "look": "a chubby little orange fox kit with a cream belly, a fluffy tail whose tip glows like a warm ember, tiny gold scarf"},
     {"id": "bolt", "name": "Bolt", "seed": 58213, "look": "a small round teal robot with a dark glass visor face showing two bright cyan dot eyes, a springy antenna with a yellow ball, stubby arms"},
     {"id": "pip", "name": "Pip", "seed": 77104, "look": "a plump cream and caramel hamster astronaut in a white space suit with an orange stripe, clear bubble helmet pushed back"},

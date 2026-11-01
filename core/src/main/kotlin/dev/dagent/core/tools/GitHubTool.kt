@@ -50,11 +50,12 @@ class GitHubClient(
     suspend fun patch(path: String, body: JsonObject): JsonElement = call("PATCH", path, emptyMap(), body)
 
     /** Plain-text GET that follows redirects (used for Actions job logs). */
-    suspend fun getText(path: String): String = withContext(Dispatchers.IO) {
+    suspend fun getText(path: String, accept: String? = null): String = withContext(Dispatchers.IO) {
         val key = token()?.trim().takeUnless { it.isNullOrEmpty() } ?: throw GitHubException(NO_TOKEN)
         val request = Request.Builder().url(base.trimEnd('/') + path)
             .header("Authorization", "Bearer $key")
             .header("User-Agent", "D-Agent")
+            .apply { if (accept != null) header("Accept", accept) }
             .build()
         http.newCall(request).execute().use { r ->
             if (!r.isSuccessful) throw GitHubException("GitHub error ${r.code} reading $path")

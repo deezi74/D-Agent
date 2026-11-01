@@ -118,21 +118,31 @@ class CharacterStudio(
         optionsDir.listFiles()?.forEach { it.delete() }
         val stamp = System.currentTimeMillis()
         val job = scope.launch {
-            seeds.mapIndexed { i, seed ->
-                async {
-                    val slot = lane.withPermit {
-                        runCatching {
-                            val f = File(optionsDir, "option-${i + 1}-$stamp.png")
-                            pollinations(prompt(description, style, Mood.IDLE), seed, f)
-                            Slot.Ready(f)
-                        }.getOrElse { Slot.Failed(it.message ?: "Couldn't draw this one") }
-                    }
-                    _slots.update { list -> list.toMutableList().also { if (i < it.size) it[i] = slot } }
-                }
-            }.awaitAll()
+            seeds.mapIndexed { i, seed -> async { drawOption(i, seed, stamp) } }.awaitAll()
         }
         optionsJob = job
         return job
+    }
+
+    private suspend fun drawOption(i: Int, seed: Int, stamp: Long) {
+        val (description, style, _) = request ?: return
+        val slot = lane.withPermit {
+            runCatching {
+                val f = File(optionsDir, "option-${i + 1}-$stamp.png")
+                pollinations(prompt(description, style, Mood.IDLE), seed, f)
+                Slot.Ready(f)
+            }.getOrElse { Slot.Failed((it.message ?: "Couldn't draw this one") + "\nTap to try again") }
+        }
+        _slots.update { list -> list.toMutableList().also { if (i < it.size) it[i] = slot } }
+    }
+
+    /** Draws option [index] again after it failed (the free image service was busy). */
+    fun retryOption(index: Int) {
+        val r = request ?: return
+        if (_slots.value.getOrNull(index) !is Slot.Failed) return
+        _slots.update { list -> list.toMutableList().also { it[index] = Slot.Loading } }
+        val seed = r.third.getOrElse(index) { (Math.random() * 9_000_000).toInt() + 1 }
+        scope.launch { drawOption(index, seed, System.currentTimeMillis()) }
     }
 
     /** Adopts option [index] (0-based) and starts drawing its mood poses. */
@@ -256,16 +266,17 @@ class CharacterStudio(
 
     /** Pollinations with patient retries: the free tier answers 402/429/503 when it is busy. */
     private fun pollinations(prompt: String, seed: Int, out: File) {
-        var wait = 8_000L
-        repeat(5) { attempt ->
+        var wait = 10_000L
+        val tries = if (pollinationsKey().isBlank()) 8 else 4
+        repeat(tries) { attempt ->
             try {
                 pollinationsOnce(prompt, seed, out)
-                if (pollinationsKey().isBlank()) Thread.sleep(6_000)
+                if (pollinationsKey().isBlank()) Thread.sleep(12_000)
                 return
             } catch (e: IOException) {
-                if (attempt == 4 || !e.message.orEmpty().contains("busy")) throw e
+                if (attempt == tries - 1 || !e.message.orEmpty().contains("busy")) throw e
                 Thread.sleep(wait)
-                wait = (wait * 2).coerceAtMost(40_000)
+                wait = (wait * 2).coerceAtMost(60_000)
             }
         }
     }

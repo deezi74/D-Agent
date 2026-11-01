@@ -148,7 +148,7 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
         }
     }
 
-    private suspend fun startJob(cmd: String): ToolResult {
+    suspend fun startJob(cmd: String): ToolResult {
         val id = "job" + System.currentTimeMillis().toString(36)
         val b64 = Base64.encodeToString(cmd.toByteArray(), Base64.NO_WRAP)
         val script = "mkdir -p ~/.dagent/jobs && cd ~/.dagent/jobs && echo '$b64' | base64 -d > $id.sh && " +

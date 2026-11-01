@@ -114,14 +114,14 @@ private fun GitHubSection(g: Graph) {
     var status by remember { mutableStateOf("") }
     Section("GitHub")
     Card {
-        Muted("Repos, issues, pull requests, notifications and files. Make a fine-grained token at github.com > Settings > Developer settings.")
+        Muted("Repos, issues, pull requests, notifications and files, plus the app builder: it makes a private repo for each app and builds a ready-to-install APK. Make a classic token at github.com > Settings > Developer settings with the repo and workflow boxes ticked (a fine-grained token needs Administration, Contents and Actions).")
         OutlinedTextField(token, { token = it.trim() }, label = { Text("Personal access token") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({
                 g.connectors.githubToken = token
                 scope.launch { status = runCatching { "Connected as " + GitHubClient({ token }, http = g.http).whoAmI() }.getOrElse { it.message ?: "Failed" } }
             }, colors = ButtonDefaults.buttonColors(containerColor = p.accent)) { Text("Save and test") }
-            OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/settings/personal-access-tokens/new"))) }) { Text("Get a token") }
+            OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/settings/tokens/new?scopes=repo,workflow&description=D-Agent"))) }) { Text("Get a token") }
         }
         if (status.isNotBlank()) Muted(status)
         ToggleRow("Allow opening issues and comments", "Off: read only", write) { write = it; g.connectors.githubWrite = it }

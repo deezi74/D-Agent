@@ -464,8 +464,9 @@ private fun CharacterStudioCard(g: Graph) {
                         val index = row * 2 + col
                         Box(
                             Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(14.dp)).background(p.bg)
-                                .clickable(enabled = slot is dev.dagent.character.CharacterStudio.Slot.Ready) {
-                                    scope.launch { runCatching { g.character.pick(index) }.onFailure { error = it.message ?: "Couldn't use it" } }
+                                .clickable(enabled = slot !is dev.dagent.character.CharacterStudio.Slot.Loading) {
+                                    if (slot is dev.dagent.character.CharacterStudio.Slot.Failed) g.character.retryOption(index)
+                                    else scope.launch { runCatching { g.character.pick(index) }.onFailure { error = it.message ?: "Couldn't use it" } }
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
