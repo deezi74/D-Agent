@@ -85,7 +85,10 @@ class CharacterStudio(
     private val json = Json { ignoreUnknownKeys = true }
     private val slow = http.newBuilder().readTimeout(180, TimeUnit.SECONDS).callTimeout(240, TimeUnit.SECONDS).build()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val lane = Semaphore(2)
+    /** Without a key the free image tier takes about one request at a time; with one, two in flight. */
+    private val keyedLane = Semaphore(2)
+    private val freeLane = Semaphore(1)
+    private val lane: Semaphore get() = if (pollinationsKey().isBlank() && openAi() == null) freeLane else keyedLane
 
     private val _active = MutableStateFlow(loadActive())
     /** The character in use, or null for the photo / monogram. */
@@ -251,7 +254,23 @@ class CharacterStudio(
         "Character portrait of $description, ${mood.pose}. ${style.phrase}. Single character, head and shoulders, centered, " +
             "facing the viewer, simple soft background, avatar framing, no text, no watermark"
 
+    /** Pollinations with patient retries: the free tier answers 402/429/503 when it is busy. */
     private fun pollinations(prompt: String, seed: Int, out: File) {
+        var wait = 8_000L
+        repeat(5) { attempt ->
+            try {
+                pollinationsOnce(prompt, seed, out)
+                if (pollinationsKey().isBlank()) Thread.sleep(6_000)
+                return
+            } catch (e: IOException) {
+                if (attempt == 4 || !e.message.orEmpty().contains("busy")) throw e
+                Thread.sleep(wait)
+                wait = (wait * 2).coerceAtMost(40_000)
+            }
+        }
+    }
+
+    private fun pollinationsOnce(prompt: String, seed: Int, out: File) {
         val url = "https://image.pollinations.ai/prompt/" + URLEncoder.encode(prompt, "UTF-8").replace("+", "%20") +
             "?width=768&height=768&model=flux&seed=$seed&nologo=true&private=true"
         val req = Request.Builder().url(url).header("User-Agent", "D-Agent")
@@ -259,7 +278,7 @@ class CharacterStudio(
         slow.newCall(req.build()).execute().use { r ->
             val type = r.header("Content-Type").orEmpty()
             if (!r.isSuccessful || !type.startsWith("image")) {
-                throw IOException("Image service said HTTP ${r.code}" + if (r.code == 429 || r.code == 402) " (busy; a free Pollinations key helps)" else "")
+                throw IOException("Image service said HTTP ${r.code}" + if (r.code == 429 || r.code == 402 || r.code >= 500) " (busy; a free Pollinations key in Tools and behavior helps)" else "")
             }
             r.body!!.byteStream().use { input -> out.outputStream().use { input.copyTo(it) } }
         }
