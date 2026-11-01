@@ -73,7 +73,12 @@ class Graph(val context: Context) {
     val connectors = Connectors(context, settings)
     val places = PlacesClient(googleKey = { connectors.googlePlacesKey.ifBlank { null } }, http = http)
     val email = EmailClient { connectors.emailAccounts }
-    val termux = TermuxBridge(context)
+    val termux = TermuxBridge(context).also { bridge ->
+        cloudVoice.startTermuxVoice = {
+            val r = dev.dagent.connectors.TermuxTool(bridge) { true }.startVoiceServer(object : dev.dagent.core.agent.ToolContext { override val sessionId = "" })
+            !r.isError
+        }
+    }
     val videos = dev.dagent.media.VideoMaker(settings)
     val content = dev.dagent.content.ContentStore(context.filesDir)
     val feedWriter = dev.dagent.content.FeedWriter(this)

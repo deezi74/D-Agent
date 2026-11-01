@@ -734,7 +734,9 @@ fun VoicePage(g: Graph, back: () -> Unit) {
                 }
             }
             OutlinedTextField(eleven, { eleven = it }, label = { Text("ElevenLabs key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+            val voiceError by g.speaker.voiceError.collectAsState()
             OutlinedButton({ g.settings.setSecret(Settings.ELEVENLABS_KEY, eleven); g.speaker.say("Hey, it's ${prefs.persona.name}. This is how I sound.") }) { Text("Test the voice") }
+            if (prefs.voiceProvider != "phone" && voiceError.isNotBlank()) Text("Natural voice didn't work, so it used the phone voice: $voiceError", color = p.bad, fontSize = 13.sp)
         }
     }
 }

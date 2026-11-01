@@ -3,6 +3,7 @@ package dev.dagent.phone
 import dev.dagent.data.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -22,6 +23,9 @@ import java.util.concurrent.TimeUnit
  * to the phone's voice on any error.
  */
 class CloudVoice(private val settings: Settings, private val cacheDir: File, http: OkHttpClient) {
+    /** Starts the Termux voice server when it isn't running; true once it answers. Set by the app. */
+    var startTermuxVoice: (suspend () -> Boolean)? = null
+    private val startLock = kotlinx.coroutines.sync.Mutex()
     private val http = http.newBuilder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(45, TimeUnit.SECONDS).build()
 
     data class Option(val id: String, val label: String, val voices: List<Pair<String, String>>)
@@ -82,10 +86,14 @@ class CloudVoice(private val settings: Settings, private val cacheDir: File, htt
                 .post(openAiBody("gpt-4o-mini-tts", text, s.voiceName).toString().toRequestBody(JSON))
                 .build()
         }
-        try { http.newCall(request).execute() } catch (e: java.net.ConnectException) {
-            if (s.voiceProvider == TERMUX) throw IOException("The Termux voice isn't running. Start it in Settings > Voice (or ask: start the free voice).")
-            throw e
-        }.use { resp ->
+        val call = try { http.newCall(request).execute() } catch (e: java.net.ConnectException) {
+            if (s.voiceProvider != TERMUX) throw e
+            // The free voice server isn't up (Termux closed it): start it once and try again.
+            val started = startLock.withLock { startTermuxVoice?.invoke() ?: false }
+            if (!started) throw IOException("The free voice isn't running in Termux. Open Settings > Voice and tap \"Set up free voice in Termux\".")
+            http.newCall(request.newBuilder().build()).execute()
+        }
+        call.use { resp ->
             if (!resp.isSuccessful) {
                 val body = resp.body?.string().orEmpty()
                 val msg = runCatching {

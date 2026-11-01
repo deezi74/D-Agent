@@ -28,6 +28,9 @@ class Speaker(context: Context, private val cloud: CloudVoice? = null) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var cloudJob: Job? = null
     private var player: android.media.MediaPlayer? = null
+    /** Why the natural voice last failed ("" when it worked), so Settings can show it. */
+    private val _voiceError = MutableStateFlow("")
+    val voiceError: StateFlow<String> = _voiceError.asStateFlow()
     private val _speaking = MutableStateFlow(false)
     val speaking: StateFlow<Boolean> = _speaking.asStateFlow()
     private var ready = false
@@ -108,12 +111,14 @@ class Speaker(context: Context, private val cloud: CloudVoice? = null) {
                     spoken = i + 1
                 }
                 _speaking.value = false
+                _voiceError.value = ""
                 done()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 _speaking.value = false
                 throw e
             } catch (e: Exception) {
                 // Cloud voice failed (no network, bad key): finish with the phone's voice.
+                _voiceError.value = e.message ?: "The natural voice failed"
                 val rest = parts.drop(spoken).joinToString(" ")
                 if (rest.isBlank()) {
                     _speaking.value = false
