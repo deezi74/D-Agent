@@ -30,7 +30,8 @@ class ScheduledTaskWorker(context: Context, params: WorkerParameters) : Coroutin
         val label = inputData.getString("label") ?: "Scheduled task"
         val graph = (applicationContext as DAgentApp).graph
         return runCatching {
-            graph.runner.runHeadless(prompt, label)
+            if (prompt == dev.dagent.content.FeedWriter.ROUTINE_PROMPT) graph.feedWriter.write()
+            else graph.runner.runHeadless(prompt, label)
             Result.success()
         }.getOrElse { Result.retry() }
     }

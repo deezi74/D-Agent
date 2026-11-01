@@ -74,6 +74,9 @@ class Graph(val context: Context) {
     val places = PlacesClient(googleKey = { connectors.googlePlacesKey.ifBlank { null } }, http = http)
     val email = EmailClient { connectors.emailAccounts }
     val termux = TermuxBridge(context)
+    val videos = dev.dagent.media.VideoMaker(settings)
+    val content = dev.dagent.content.ContentStore(context.filesDir)
+    val feedWriter = dev.dagent.content.FeedWriter(this)
     val runner = AgentRunner(this)
     val telegram = TelegramBot(this)
 }

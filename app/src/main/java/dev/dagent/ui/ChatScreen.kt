@@ -42,6 +42,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
@@ -123,7 +124,7 @@ private val IMAGE_EXT = setOf("png", "jpg", "jpeg", "webp", "gif")
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings: (String) -> Unit, openVoice: () -> Unit = {}) {
+fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings: (String) -> Unit, openVoice: () -> Unit = {}, openDiscover: () -> Unit = {}) {
     val p = LocalPalette.current
     val state by g.runner.state.collectAsState()
     val prefs by g.settings.state.collectAsState()
@@ -182,6 +183,7 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
                     )
                 }
                 ModeSwitch(prefs.agentMode) { on -> g.settings.update { it.copy(agentMode = on) } }
+                IconButton(openDiscover) { Icon(Icons.Default.Explore, "Discover: feed, goals and ideas", tint = p.text) }
                 IconButton(openVoice) { Icon(Icons.Default.GraphicEq, "Voice mode", tint = p.accent) }
                 IconButton({ g.runner.newChat() }) { Icon(Icons.Default.Edit, "New chat", tint = p.text) }
             }
@@ -461,6 +463,20 @@ private fun FileStrip(paths: List<String>) {
             val f = File(path)
             if (f.extension.lowercase() in IMAGE_EXT) {
                 AsyncImage(f, f.name, contentScale = ContentScale.Crop, modifier = Modifier.size(220.dp).clip(RoundedCornerShape(16.dp)).clickable { full = path })
+            } else if (f.extension.lowercase() in listOf("mp4", "webm", "3gp") && f.isFile) {
+                Column {
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        factory = { c ->
+                            android.widget.VideoView(c).apply {
+                                setVideoPath(f.absolutePath)
+                                setMediaController(android.widget.MediaController(c).also { it.setAnchorView(this) })
+                                setOnPreparedListener { mp -> mp.isLooping = true; start() }
+                            }
+                        },
+                        modifier = Modifier.size(width = 200.dp, height = 300.dp).clip(RoundedCornerShape(16.dp)),
+                    )
+                    TextButton({ shareFile(context, f) }) { Text("Share video") }
+                }
             } else {
                 Row(
                     Modifier.clip(RoundedCornerShape(12.dp)).background(p.surface2).clickable { openFile(context, f) }.padding(horizontal = 12.dp, vertical = 8.dp),

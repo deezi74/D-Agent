@@ -11,6 +11,7 @@ import dev.dagent.Graph
 import dev.dagent.R
 import dev.dagent.browser.BrowserTool
 import dev.dagent.character.CharacterTool
+import dev.dagent.media.MakeVideoTool
 import dev.dagent.connectors.EmailTool
 import dev.dagent.connectors.TermuxTool
 import dev.dagent.core.places.GeoPoint
@@ -280,6 +281,7 @@ class AgentRunner(private val g: Graph) {
             WebFetchTool(g.http),
             ImageTool(g.http, ws, { g.settings.secret(Settings.POLLINATIONS_KEY) }) { g.settings.provider("openai").apiKey to g.settings.provider("openrouter").apiKey },
             CharacterTool(g.character),
+            MakeVideoTool(g.videos, ws),
             WeatherTool(g.places, locate),
             PlacesTool(g.places, locate),
             RememberTool(g.memory),
@@ -330,6 +332,25 @@ class AgentRunner(private val g: Graph) {
         }
         g.chats.save(session)
         notifyDone(final.ifBlank { "Finished." }, label)
+        return final
+    }
+
+    /** One quick background answer with web and memory tools only (the feed). Nothing is saved as a chat. */
+    suspend fun runOnce(prompt: String, maxSteps: Int = 8): String {
+        val provider = g.settings.provider()
+        val prefs = g.settings.current
+        if (provider.id == Providers.LOCAL_ID) {
+            val file = g.local.installed().firstOrNull { it.name == prefs.localModelFile } ?: g.local.installed().first()
+            g.local.ensureRunning(file, prefs.localContext, prefs.localThreads)
+        }
+        val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
+        val tools = listOf<Tool>(WebSearchTool(g.search), WebFetchTool(g.http), RecallTool(g.memory))
+        val system = PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = false, agentMode = false), g.memory.forPrompt(), emptyList(), tools.map { it.name }.toSet())
+        var final = ""
+        val ctx = object : ToolContext { override val sessionId = "once" }
+        AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = maxSteps)).run(system, listOf(Msg.user(prompt)), ctx).collect { ev ->
+            if (ev is AgentEvent.Message && ev.msg.role == Role.ASSISTANT && ev.msg.toolCalls.isEmpty()) final = ev.msg.text
+        }
         return final
     }
 

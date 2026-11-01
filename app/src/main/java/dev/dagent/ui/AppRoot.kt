@@ -19,6 +19,7 @@ sealed interface Screen {
     data object Chat : Screen
     data class Settings(val page: String = "home") : Screen
     data object Voice : Screen
+    data object Discover : Screen
 }
 
 @Composable
@@ -38,8 +39,9 @@ fun AppRoot(g: Graph, shared: MutableState<Pair<String, Uri?>?>) {
     }
 
     when (val top = stack.last()) {
-        Screen.Chat -> ChatScreen(g, shared, openSettings = { go(Screen.Settings(it)) }, openVoice = { go(Screen.Voice) })
+        Screen.Chat -> ChatScreen(g, shared, openSettings = { go(Screen.Settings(it)) }, openVoice = { go(Screen.Voice) }, openDiscover = { go(Screen.Discover) })
         Screen.Voice -> VoiceMode(g) { back() }
+        Screen.Discover -> DiscoverScreen(g, back = { back() }, startChat = { prompt -> g.runner.newChat(); shared.value = prompt to null; back() })
         is Screen.Settings -> SettingsHost(g, top.page, open = { go(Screen.Settings(it)) }, back = { back() })
     }
 
