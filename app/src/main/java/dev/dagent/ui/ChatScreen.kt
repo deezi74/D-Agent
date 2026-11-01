@@ -44,6 +44,8 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -626,6 +628,7 @@ private fun Composer(
     val context = LocalContext.current
     var menu by remember { mutableStateOf(false) }
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(4)) { uris -> attachments += uris }
+    val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> attachments += uris.take(10) }
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> if (ok) cameraUri?.let { attachments += it } }
     val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -638,7 +641,23 @@ private fun Composer(
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 attachments.toList().forEach { uri ->
                     Box {
-                        AsyncImage(uri, null, contentScale = ContentScale.Crop, modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)))
+                        val type = remember(uri) { runCatching { context.contentResolver.getType(uri) }.getOrNull().orEmpty() }
+                        if (type.isEmpty() || type.startsWith("image/")) {
+                            AsyncImage(uri, null, contentScale = ContentScale.Crop, modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)))
+                        } else {
+                            val name = remember(uri) {
+                                runCatching {
+                                    context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                                }.getOrNull() ?: "file"
+                            }
+                            Column(
+                                Modifier.size(width = 120.dp, height = 64.dp).clip(RoundedCornerShape(12.dp)).background(p.surface2).padding(8.dp),
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                Icon(Icons.Default.Description, null, tint = p.accent, modifier = Modifier.size(20.dp))
+                                Text(name, color = p.text, fontSize = 11.sp, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                        }
                         Icon(Icons.Default.Close, "Remove", tint = Color.White,
                             modifier = Modifier.align(Alignment.TopEnd).size(20.dp).clip(CircleShape).background(Color(0x99000000)).clickable { attachments.remove(uri) })
                     }
@@ -655,6 +674,10 @@ private fun Composer(
                     androidx.compose.material3.DropdownMenuItem(
                         text = { Text("Photos") }, leadingIcon = { Icon(Icons.Default.Image, null) },
                         onClick = { menu = false; pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Files") }, leadingIcon = { Icon(Icons.Default.AttachFile, null) },
+                        onClick = { menu = false; pickFiles.launch(arrayOf("*/*")) },
                     )
                     androidx.compose.material3.DropdownMenuItem(
                         text = { Text("Camera") }, leadingIcon = { Icon(Icons.Default.CameraAlt, null) },

@@ -148,10 +148,17 @@ class AgentRunner(private val g: Graph) {
     fun send(text: String, images: List<Uri> = emptyList()) {
         if (_state.value.running || (text.isBlank() && images.isEmpty())) return
         job = scope.launch {
-            val prepared = prepareImages(images)
+            val photos = images.filter { isImage(it) }
+            val prepared = prepareImages(photos)
+            val files = prepareFiles(images - photos.toSet())
             var userText = text.trim()
-            if (prepared.isNotEmpty()) {
-                userText += "\n\n[Attached: " + prepared.joinToString { g.workspace.display(it.second) } + "]"
+            val shownFiles = prepared.map { it.second } + files.map { it.first }
+            if (shownFiles.isNotEmpty()) {
+                userText += "\n\n[Attached: " + shownFiles.joinToString { g.workspace.display(it) } + "]"
+            }
+            files.forEach { (f, digest) ->
+                userText += "\n\n--- ${f.name} ---\n" + (digest
+                    ?: "(Saved at ${g.workspace.display(f)}. It isn't plain text, so read it with your tools, e.g. pdftotext or unzip in the Linux computer.)")
             }
             val user = Msg.user(userText.trim(), prepared.map { it.first })
             var session = _state.value.session
@@ -507,6 +514,32 @@ class AgentRunner(private val g: Graph) {
     }
 
     /** Shrinks picked photos, keeps a copy in /workspace/uploads, and returns them for the model. */
+    private fun isImage(uri: Uri): Boolean {
+        val type = runCatching { g.context.contentResolver.getType(uri) }.getOrNull()
+        if (type != null) return type.startsWith("image/") && !type.contains("svg")
+        return uri.lastPathSegment.orEmpty().lowercase().let { n -> listOf(".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif").any { n.endsWith(it) } }
+    }
+
+    /** Copies attached documents into the workspace (uploads/) and reads what text it can from them. */
+    private suspend fun prepareFiles(uris: List<Uri>): List<Pair<File, String?>> = withContext(Dispatchers.IO) {
+        uris.mapNotNull { uri ->
+            runCatching {
+                val name = runCatching {
+                    g.context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) c.getString(0) else null
+                    }
+                }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "file"
+                val safe = name.replace(Regex("[^A-Za-z0-9._ -]"), "_").trim().ifBlank { "file" }.take(80)
+                val dir = File(g.workspace.root, "uploads").apply { mkdirs() }
+                var file = File(dir, safe)
+                if (file.exists()) file = File(dir, safe.substringBeforeLast('.') + "-" + System.currentTimeMillis() % 100000 + (if (safe.contains('.')) "." + safe.substringAfterLast('.') else ""))
+                g.context.contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use { input.copyTo(it) } } ?: return@runCatching null
+                val digest = if (file.length() < 25_000_000) dev.dagent.core.tools.FileDigest.extract(file.name, file.readBytes()) else null
+                file to digest
+            }.getOrNull()
+        }
+    }
+
     private suspend fun prepareImages(uris: List<Uri>): List<Pair<ImagePart, File>> = withContext(Dispatchers.IO) {
         uris.mapNotNull { uri ->
             runCatching {
