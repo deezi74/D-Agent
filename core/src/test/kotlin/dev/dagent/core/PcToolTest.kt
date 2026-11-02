@@ -28,6 +28,24 @@ class PcToolTest {
         assertEquals("https://pc.tail1234.ts.net:8787", PcClient.normalize("https://pc.tail1234.ts.net"))
     }
 
+    @Test fun wakesTheWorkerOnThisPhone() = runBlocking {
+        assertTrue(PcClient.isOnThisPhone("127.0.0.1"))
+        assertTrue(PcClient.isOnThisPhone("http://localhost:8787"))
+        assertTrue(!PcClient.isOnThisPhone("192.168.1.113"))
+        val port = java.net.ServerSocket(0).use { it.localPort }
+        val server = MockWebServer()
+        var woke = 0
+        val client = PcClient({ "127.0.0.1:$port" }, { "x" }, wake = {
+            woke++
+            server.enqueue(MockResponse().setBody("""{"name":"phone","os":"Android 15 (Termux)"}"""))
+            server.start(port)
+            true
+        })
+        assertEquals("phone", (client.health()["name"] as kotlinx.serialization.json.JsonPrimitive).content)
+        assertEquals(1, woke)
+        server.shutdown()
+    }
+
     @Test fun startsTasksAndWatchesThem() = runBlocking {
         val server = MockWebServer()
         server.enqueue(MockResponse().setBody("""{"id":"abc123","title":"Research","status":"queued"}""").setHeader("Content-Type", "application/json"))

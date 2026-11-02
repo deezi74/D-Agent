@@ -38,12 +38,15 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 HOME = Path(os.environ.get("DAGENT_PC_HOME", Path.home() / ".dagent-pc"))
 CONFIG_FILE = HOME / "config.json"
 TASKS_DIR = HOME / "tasks"
 LOG_FILE = HOME / "dagent-pc.log"
 IS_WINDOWS = platform.system() == "Windows"
+# Running inside Termux on an Android phone: the phone is its own always-on computer.
+IS_TERMUX = "com.termux" in os.environ.get("PREFIX", "") or "TERMUX_VERSION" in os.environ
+OS_NAME = f"Android {platform.release()} (Termux)" if IS_TERMUX else f"{platform.system()} {platform.release()}"
 
 DEFAULT_CONFIG = {
     "port": 8787,
@@ -52,12 +55,14 @@ DEFAULT_CONFIG = {
     "workspace": str(Path.home() / "D-Agent"),
     "allow_shell": True,
     "max_steps": 40,
+    # On a phone only D-Agent on the same phone may connect; a PC listens on the home network.
+    "bind": "127.0.0.1" if IS_TERMUX else "0.0.0.0",
     "llm": {
-        # LM Studio's server. For Ollama use http://localhost:11434/v1.
-        "base_url": "http://localhost:1234/v1",
+        # LM Studio's server on a PC; FreeLLMAPI on a phone. For Ollama use http://localhost:11434/v1.
+        "base_url": "http://localhost:3001/v1" if IS_TERMUX else "http://localhost:1234/v1",
         "api_key": "",
         # Empty: use the first model the server lists.
-        "model": "",
+        "model": "auto" if IS_TERMUX else "",
     },
 }
 
@@ -157,7 +162,9 @@ class Llm:
             raise RuntimeError(f"The model server answered {e.code}: {detail}") from None
         except urllib.error.URLError as e:
             raise RuntimeError(
-                f"Can't reach the model at {self.base} ({e.reason}). Start LM Studio's server (Developer tab) or Ollama."
+                f"Can't reach the model at {self.base} ({e.reason}). " + (
+                    "Start FreeLLMAPI in Termux, or pick another AI in D-Agent (Your PC > Use the app's AI)." if IS_TERMUX
+                    else "Start LM Studio's server (Developer tab) or Ollama.")
             ) from None
 
     def models(self) -> list[str]:
@@ -310,7 +317,7 @@ def tool_specs() -> list:
 
 
 def system_prompt(cfg: dict) -> str:
-    os_name = f"{platform.system()} {platform.release()}"
+    os_name = OS_NAME
     shell = "PowerShell" if IS_WINDOWS else "bash"
     return (
         f"You are D-Agent's computer: an AI agent running on the owner's own {os_name} PC named {cfg['name']}. "
@@ -615,7 +622,7 @@ class Api(BaseHTTPRequestHandler):
                 running = sum(1 for t in w.tasks.values() if t.status in ("queued", "running"))
                 return self._send(200, {
                     "app": "dagent-pc", "version": VERSION, "name": w.cfg["name"],
-                    "os": f"{platform.system()} {platform.release()}", "workspace": str(w.workspace),
+                    "os": OS_NAME, "workspace": str(w.workspace),
                     "llm": {"base_url": llm.base, "model": w.cfg["llm"].get("model") or (models[0] if models else ""), "models": models[:50], "problem": problem},
                     "running": running,
                 })
@@ -697,11 +704,15 @@ def show_code(cfg: dict) -> None:
     print("  D-Agent PC is ready")
     print("  -------------------")
     print(f"  Pairing code:  {cfg['token']}")
-    for a in local_addresses() or ["<this PC's IP>"]:
-        print(f"  Address:       http://{a}:{port}")
+    if cfg.get("bind", "0.0.0.0").startswith("127."):
+        print(f"  Address:       http://127.0.0.1:{port}  (only apps on this device)")
+    else:
+        for a in local_addresses() or ["<this PC's IP>"]:
+            print(f"  Address:       http://{a}:{port}")
     print()
     print("  In D-Agent: Settings > Connectors > Your PC. Enter the address and the pairing code.")
-    print(f"  Model server:  {cfg['llm']['base_url']}  (LM Studio: Developer tab > Start server)")
+    hint = "FreeLLMAPI, or tap Use the app's AI in D-Agent" if IS_TERMUX else "LM Studio: Developer tab > Start server"
+    print(f"  Model server:  {cfg['llm']['base_url']}  ({hint})")
     print()
 
 
@@ -711,12 +722,20 @@ def main() -> None:
     ap.add_argument("--new-code", action="store_true", help="make a new pairing code")
     ap.add_argument("--task", help="run one task in this console and print the result")
     ap.add_argument("--port", type=int, help="port to listen on (default 8787)")
+    ap.add_argument("--token", action="store_true", help="print only the pairing code (used by the D-Agent app)")
+    ap.add_argument("--bind", help="address to listen on: 0.0.0.0 (home network) or 127.0.0.1 (this device only)")
     args = ap.parse_args()
 
     cfg = load_config()
     if args.port:
         cfg["port"] = args.port
         save_config(cfg)
+    if args.bind:
+        cfg["bind"] = args.bind
+        save_config(cfg)
+    if args.token:
+        print(cfg["token"])
+        return
     if args.new_code:
         cfg["token"] = new_code()
         save_config(cfg)
@@ -737,7 +756,7 @@ def main() -> None:
 
     Api.worker = Worker(cfg)
     try:
-        httpd = ThreadingHTTPServer(("0.0.0.0", int(cfg["port"])), Api)
+        httpd = ThreadingHTTPServer((cfg.get("bind") or "0.0.0.0", int(cfg["port"])), Api)
     except OSError as e:
         log(f"Port {cfg['port']} is busy ({e}). Is D-Agent PC already running?")
         sys.exit(1)

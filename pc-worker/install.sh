@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# D-Agent PC installer for Linux (Ubuntu, Debian, Fedora, Arch, Crostini) and macOS.
+# D-Agent PC installer for Linux (Ubuntu, Debian, Fedora, Arch, Crostini), macOS and Termux on Android.
 #   curl -fsSL https://raw.githubusercontent.com/deezi74/D-Agent/claude/project-thread-7jgi6v/pc-worker/install.sh | bash
+# In Termux it makes the phone its own always-on computer, listening only on 127.0.0.1.
 set -euo pipefail
 BRANCH="claude/project-thread-7jgi6v"
 RAW="https://raw.githubusercontent.com/deezi74/D-Agent/$BRANCH/pc-worker"
@@ -8,6 +9,13 @@ DIR="$HOME/.dagent-pc"
 SCRIPT="$DIR/dagent_pc.py"
 PORT=8787
 say() { printf '\033[36m==> %s\033[0m\n' "$*"; }
+TERMUX=0
+case "${PREFIX:-}" in *com.termux*) TERMUX=1 ;; esac
+[ -n "${TERMUX_VERSION:-}" ] && TERMUX=1
+if [ "$TERMUX" = 1 ] && ! command -v python >/dev/null 2>&1; then
+  say "Installing Python in Termux..."
+  pkg install -y python
+fi
 
 PY=""
 for c in python3 python; do
@@ -30,7 +38,24 @@ curl -fsSL "$RAW/dagent_pc.py" -o "$SCRIPT.new"
 mv -f "$SCRIPT.new" "$SCRIPT"
 pkill -f "dagent_pc.py" 2>/dev/null || true
 
-if [ "$(uname)" = "Darwin" ]; then
+if [ "$TERMUX" = 1 ]; then
+  say "Setting up D-Agent PC on this phone..."
+  cat > "$DIR/start.sh" <<ST
+#!/data/data/com.termux/files/usr/bin/bash
+# Starts D-Agent PC if it isn't running. Used by Termux:Boot and by the D-Agent app.
+command -v termux-wake-lock >/dev/null && termux-wake-lock
+if ! pgrep -f "dagent_pc.py" >/dev/null 2>&1; then
+  cd "\$HOME"
+  setsid nohup "$PY" "$SCRIPT" >/dev/null 2>&1 < /dev/null &
+fi
+ST
+  chmod 700 "$DIR/start.sh"
+  # Termux:Boot (optional add-on from F-Droid) runs this when the phone starts.
+  mkdir -p "$HOME/.termux/boot"
+  cp -f "$DIR/start.sh" "$HOME/.termux/boot/dagent-pc.sh"
+  "$PY" "$SCRIPT" --bind 127.0.0.1 --token >/dev/null
+  bash "$DIR/start.sh"
+elif [ "$(uname)" = "Darwin" ]; then
   PLIST="$HOME/Library/LaunchAgents/dev.dagent.pc.plist"
   mkdir -p "$(dirname "$PLIST")"
   cat > "$PLIST" <<PL
@@ -68,7 +93,7 @@ else
   nohup "$PY" "$SCRIPT" >/dev/null 2>&1 &
 fi
 
-if command -v ufw >/dev/null && sudo -n true 2>/dev/null; then sudo ufw allow "$PORT"/tcp >/dev/null || true; fi
+if [ "$TERMUX" = 0 ] && command -v ufw >/dev/null && sudo -n true 2>/dev/null; then sudo ufw allow "$PORT"/tcp >/dev/null || true; fi
 sleep 2
 "$PY" "$SCRIPT" --code
 say "Done. Logs: $DIR/dagent-pc.log  Settings: $DIR/config.json"

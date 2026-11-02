@@ -29,7 +29,7 @@ object PcWatch {
     private const val PERIODIC = "pc-watch"
     private const val SOON = "pc-watch-soon"
 
-    fun client(g: Graph) = PcClient({ g.connectors.pcUrl }, { g.connectors.pcCode }, g.http)
+    fun client(g: Graph) = PcClient({ g.connectors.pcUrl }, { g.connectors.pcCode }, g.http, wake = { LocalPc.ensureRunning(g) })
 
     fun add(context: Context, g: Graph, id: String, title: String) {
         g.connectors.pcWatched = g.connectors.pcWatched + "$id|${title.replace('|', ' ').take(80)}"

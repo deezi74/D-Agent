@@ -66,3 +66,17 @@ python dagent_pc.py --task "..." # run one task in the console
 
 - **Windows:** delete `D-Agent PC` from `shell:startup`, end the `pythonw` process, then delete `%USERPROFILE%\.dagent-pc`.
 - **Linux:** run `systemctl --user disable --now dagent-pc`, then `rm -rf ~/.dagent-pc ~/.config/systemd/user/dagent-pc.service`.
+
+## On the phone itself (Termux)
+
+No PC needed: D-Agent PC also runs inside Termux, so the phone is its own always-on computer.
+In D-Agent open Settings ▸ Connectors ▸ Always-on computer ▸ **This phone** and tap
+**Set up on this phone** (the Termux connector must be on). Or by hand in Termux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/deezi74/D-Agent/claude/project-thread-7jgi6v/pc-worker/install.sh | bash
+```
+
+On a phone it listens only on 127.0.0.1, uses FreeLLMAPI (`http://localhost:3001/v1`) until the
+app hands it another model ("Use the app's AI"), and holds a Termux wake lock. Install
+Termux:Boot from F-Droid to start it when the phone turns on; `bash ~/.dagent-pc/start.sh` starts it by hand.

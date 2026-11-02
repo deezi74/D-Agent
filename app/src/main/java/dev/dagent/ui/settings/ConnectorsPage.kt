@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package dev.dagent.ui.settings
 
 import android.content.Intent
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -94,18 +97,46 @@ private fun PcSection(g: Graph) {
         cm.setPrimaryClip(android.content.ClipData.newPlainText(what, text))
         status = "Copied the $what command. Paste it on the computer."
     }
-    Section("Your PC (always-on computer)")
+    var where by remember { mutableStateOf(if (url.isBlank() || dev.dagent.connectors.LocalPc.isLocal(url)) "phone" else "pc") }
+    var busy by remember { mutableStateOf(false) }
+    Section("Always-on computer")
     Card {
-        Muted("Turn your computer into ${g.settings.current.persona.name}'s always-on computer. Big jobs (research, coding, downloads) run there with your PC's AI model, keep going while the phone sleeps, and you get a notification when they're done. Ask things like \"on my PC, research the best 65-inch TVs and save a report\".")
-        Text("1. On the computer, install D-Agent PC:", color = p.text, fontSize = 14.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton({ copy(PC_INSTALL_WINDOWS, "Windows (PowerShell)") }) { Text("Copy Windows command") }
-            OutlinedButton({ copy(PC_INSTALL_LINUX, "Linux/Mac") }) { Text("Linux/Mac") }
+        Muted("Big jobs (research, coding, downloads) run on an always-on computer, keep going while you use other apps or the screen is off, and you get a notification when they're done. Ask things like \"in the background, research the best 65-inch TVs and save a report\". Use this phone through Termux, or a PC or laptop.")
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("phone" to "This phone", "pc" to "A PC or laptop").forEach { (id, label) ->
+                FilterChip(selected = where == id, onClick = { where = id; status = "" }, label = { Text(label) })
+            }
         }
-        Muted("Send the command to your PC (email or a notes app), paste it into PowerShell, and press Enter. It prints an address and a pairing code.")
-        Text("2. Enter what it shows:", color = p.text, fontSize = 14.sp)
-        OutlinedTextField(url, { url = it; g.connectors.pcUrl = it }, label = { Text("Address (e.g. 192.168.1.20)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(code, { code = it; g.connectors.pcCode = it }, label = { Text("Pairing code") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        if (where == "phone") {
+            Muted("Runs D-Agent PC inside Termux on this phone, only reachable by apps on this phone. Needs Termux from F-Droid and the Termux connector below turned on. Add Termux:Boot from F-Droid to start it when the phone turns on.")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button({
+                    busy = true
+                    scope.launch {
+                        status = dev.dagent.connectors.LocalPc.install(g) { status = it }
+                        url = g.connectors.pcUrl; code = g.connectors.pcCode
+                        busy = false
+                    }
+                }, enabled = !busy) { Text(if (dev.dagent.connectors.LocalPc.isLocal(url) && code.isNotBlank()) "Update" else "Set up on this phone") }
+                if (dev.dagent.connectors.LocalPc.isLocal(url) && code.isNotBlank()) OutlinedButton({
+                    busy = true
+                    scope.launch {
+                        status = if (dev.dagent.connectors.LocalPc.ensureRunning(g)) "Running on this phone." else "It didn't start. Check the Termux connector below, or in Termux run: bash ~/.dagent-pc/start.sh"
+                        busy = false
+                    }
+                }, enabled = !busy) { Text("Start") }
+            }
+        } else {
+            Text("1. On the computer, install D-Agent PC:", color = p.text, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ copy(PC_INSTALL_WINDOWS, "Windows (PowerShell)") }) { Text("Copy Windows command") }
+                OutlinedButton({ copy(PC_INSTALL_LINUX, "Linux/Mac") }) { Text("Linux/Mac") }
+            }
+            Muted("Send the command to the computer (email or a notes app), paste it into PowerShell (Windows) or a terminal (Linux, Mac), and press Enter. It prints an address and a pairing code. An old laptop with 4 GB works fine, since the AI can run somewhere else.")
+            Text("2. Enter what it shows:", color = p.text, fontSize = 14.sp)
+            OutlinedTextField(url, { url = it; g.connectors.pcUrl = it }, label = { Text("Address (e.g. 192.168.1.20)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(code, { code = it; g.connectors.pcCode = it }, label = { Text("Pairing code") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({
                 status = "Checking..."
@@ -122,9 +153,13 @@ private fun PcSection(g: Graph) {
                     }.getOrElse { it.message ?: "Couldn't connect." }
                 }
             }) { Text("Test") }
+            OutlinedButton({
+                status = "Updating..."
+                scope.launch { status = dev.dagent.connectors.LocalPc.useAppAi(g) }
+            }) { Text("Use the app's AI") }
         }
         if (models.isNotEmpty()) {
-            Text("Model the PC uses for tasks:", color = p.text, fontSize = 14.sp)
+            Text("Model it uses for tasks:", color = p.text, fontSize = 14.sp)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 models.forEach { m ->
                     val on = m == model
@@ -137,7 +172,7 @@ private fun PcSection(g: Graph) {
             }
         }
         if (status.isNotBlank()) Muted(status)
-        Muted("Away from home? Install Tailscale on the PC and the phone and use the PC's Tailscale address. Never open port 8787 on your router.")
+        if (where == "pc") Muted("Away from home? Install Tailscale on the PC and the phone and use the PC's Tailscale address. Never open port 8787 on your router.")
     }
 }
 

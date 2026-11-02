@@ -36,6 +36,8 @@ class PcClient(
     private val url: () -> String,
     private val code: () -> String,
     http: OkHttpClient = OkHttpClient(),
+    /** Starts D-Agent PC when it runs on this phone (Termux) and isn't answering; true if it came up. */
+    private val wake: (suspend () -> Boolean)? = null,
 ) {
     private val http = http.newBuilder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(150, TimeUnit.SECONDS).build()
     private val json = Json { ignoreUnknownKeys = true }
@@ -78,14 +80,23 @@ class PcClient(
 
     private suspend fun send(b: Request.Builder): JsonElement = withContext(Dispatchers.IO) {
         if (url().isBlank()) throw IllegalStateException(NOT_SET_UP)
+        val request = auth(b).build()
+        fun call() = http.newCall(request).execute().use { r ->
+            val text = r.body?.string().orEmpty()
+            if (!r.isSuccessful) throw IllegalStateException(error(r.code, text))
+            json.parseToJsonElement(text)
+        }
         try {
-            http.newCall(auth(b).build()).execute().use { r ->
-                val text = r.body?.string().orEmpty()
-                if (!r.isSuccessful) throw IllegalStateException(error(r.code, text))
-                json.parseToJsonElement(text)
-            }
+            call()
         } catch (e: java.io.IOException) {
-            throw IllegalStateException("Can't reach your PC at ${base()} (${e.message}). Check it's on and awake, D-Agent PC is running, and the phone is on the same Wi-Fi or Tailscale.")
+            val woke = wake != null && isOnThisPhone(url()) && runCatching { wake.invoke() }.getOrDefault(false)
+            if (woke) {
+                try { return@withContext call() } catch (_: java.io.IOException) { }
+            }
+            throw IllegalStateException(
+                if (isOnThisPhone(url())) "D-Agent PC on this phone isn't running and couldn't be started. Open Settings > Connectors > Your PC and tap Start, or in Termux run: bash ~/.dagent-pc/start.sh"
+                else "Can't reach your PC at ${base()} (${e.message}). Check it's on and awake, D-Agent PC is running, and the phone is on the same Wi-Fi or Tailscale."
+            )
         }
     }
 
@@ -107,6 +118,12 @@ class PcClient(
         const val BAD_URL = "The PC address doesn't look right. Use something like 192.168.1.20 or http://192.168.1.20:8787."
         const val DEFAULT_PORT = 8787
 
+        /** The always-on computer is this phone itself (D-Agent PC running in Termux). */
+        fun isOnThisPhone(raw: String): Boolean {
+            val host = normalize(raw).substringAfter("://").substringBefore('/').substringBeforeLast(':')
+            return host == "127.0.0.1" || host == "localhost"
+        }
+
         fun normalize(raw: String): String {
             var s = raw.trim().trimEnd('/')
             if (s.isEmpty()) return s
@@ -125,8 +142,9 @@ class PcTool(
     private val watch: (String, String) -> Unit = { _, _ -> },
 ) : Tool {
     override val name = "pc"
-    override val description =
-        "The person's own computer (D-Agent PC), which stays on. Use it for long or heavy work that should keep going while the phone " +
+    override val description get() =
+        (if (PcClient.isOnThisPhone(pc.base())) "The always-on computer (D-Agent PC) running in Termux on this phone, in the background. "
+        else "The person's own computer (D-Agent PC), which stays on. ") + "Use it for long or heavy work that should keep going while the phone " +
             "sleeps: research, coding, big downloads, file conversion, anything taking more than a few minutes. start_task hands over a " +
             "whole job (write a complete, standalone prompt; the PC can't see this chat); the person gets a notification when it's done. " +
             "Actions: status (is it on, which model), start_task (title, prompt), task (id: progress and result), tasks (recent), " +
