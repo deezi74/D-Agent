@@ -1,0 +1,173 @@
+{
+ "style": "cinematic digital illustration, wide 16:9 banner, rich saturated colors, dramatic rim lighting, sharp detail, depth of field, no text, no letters, no logos, no watermark",
+ "covers": {
+  "byte": {
+   "art": "a glowing holographic code editor floating above a sleek laptop in a dark neon-lit room, lines of colorful code, a small friendly robot assistant pointing at the screen",
+   "seed": 1000
+  },
+  "volt": {
+   "art": "an ESP32 board, soldering iron with a wisp of smoke, jumper wires and a small LoRa antenna on a cluttered maker workbench, warm desk lamp light",
+   "seed": 1037
+  },
+  "shield": {
+   "art": "a glowing blue energy shield protecting a smartphone and a laptop from red digital arrows, dark cyber background with circuit lines",
+   "seed": 1074
+  },
+  "hustle": {
+   "art": "a young entrepreneur's desk at sunrise with a phone showing rising sales charts, coffee, sticky notes and a city skyline through the window",
+   "seed": 1111
+  },
+  "sage": {
+   "art": "a cozy library with floating glowing books and a wise owl perched on a stack, soft golden light, chalkboard with equations in the background",
+   "seed": 1148
+  },
+  "buddy": {
+   "art": "two friendly cartoon characters sitting on a hill at sunset sharing headphones, warm pastel sky, cozy and comforting mood",
+   "seed": 1185
+  },
+  "scout": {
+   "art": "a smartphone camera lens with a glowing AR overlay identifying objects in a sunny street scene, futuristic scanning lines",
+   "seed": 1222
+  },
+  "draft": {
+   "art": "a neat stack of documents, a fountain pen and a glowing tablet with a contract on a wooden desk, soft morning light",
+   "seed": 1259
+  },
+  "rom": {
+   "art": "an Android phone opened on a repair mat connected by USB cable to a laptop showing a terminal, green robot mascot-like glow, tools around",
+   "seed": 1296
+  },
+  "skillet": {
+   "art": "a sizzling cast iron skillet with colorful vegetables and herbs in a warm rustic kitchen, steam rising, fresh ingredients on a cutting board",
+   "seed": 1333
+  },
+  "rep": {
+   "art": "a determined athlete doing push-ups in a sunlit living room, motion energy lines, dumbbells and a water bottle nearby",
+   "seed": 1370
+  },
+  "wrench": {
+   "art": "a mechanic's hands with a wrench under the open hood of a car in a garage, tool wall in background, warm work light",
+   "seed": 1407
+  },
+  "ledger": {
+   "art": "a piggy bank, coins and a glowing budgeting chart on a phone, green and gold tones, clean modern desk",
+   "seed": 1444
+  },
+  "story": {
+   "art": "an open book with a fantasy world rising out of its pages, castles, dragons and floating islands, magical sparkles",
+   "seed": 1481
+  },
+  "lingo": {
+   "art": "colorful speech bubbles in many shapes floating over a world map, friendly travelers chatting, bright cheerful colors",
+   "seed": 1518
+  },
+  "trip": {
+   "art": "a vintage suitcase with a passport and map at the edge of a cliff overlooking a turquoise sea and a coastal town, golden hour",
+   "seed": 1555
+  },
+  "quest": {
+   "art": "a fantasy tabletop with dice, a glowing map and miniature heroes, candlelight, a mysterious dungeon door in the background",
+   "seed": 1592
+  },
+  "shorts": {
+   "art": "a vertical smartphone on a ring light tripod filming a creator, neon pink and cyan studio lights, social media hearts floating",
+   "seed": 1629
+  },
+  "ctf": {
+   "art": "a red capture flag planted on a glowing digital mountain made of code blocks, hacker silhouette climbing, dark purple night",
+   "seed": 1666
+  },
+  "homelab": {
+   "art": "a small home server rack with blinking lights, several monitors with virtual machines, cables neatly routed, cool blue glow",
+   "seed": 1703
+  },
+  "recon": {
+   "art": "a telescope pointed at a glowing network map of nodes and connections in the night sky, a bug-shaped constellation",
+   "seed": 1740
+  },
+  "webtest": {
+   "art": "a giant glowing spider web made of web browser windows and code, a magnifying glass inspecting a strand, dark blue",
+   "seed": 1777
+  },
+  "packets": {
+   "art": "streams of glowing data packets flowing between a Wi-Fi router and devices like rivers of light, green matrix tones",
+   "seed": 1814
+  },
+  "reverse": {
+   "art": "a translucent ghost hovering over a disassembled circuit board and floating assembly code, eerie teal light",
+   "seed": 1851
+  },
+  "blueteam": {
+   "art": "a security operations center with big screens showing maps and alerts, an analyst in a hoodie watching, deep blue tones",
+   "seed": 1888
+  },
+  "cyberdeck": {
+   "art": "a rugged military-style cyberdeck case open on a workbench with a small screen, mechanical keyboard, antennas and a Raspberry Pi inside",
+   "seed": 1925
+  },
+  "droidsec": {
+   "art": "a green android robot figure under a magnifying glass with hooks and probes attached, lab bench, glowing code reflections",
+   "seed": 1962
+  },
+  "decoder": {
+   "art": "an ancient cipher wheel merging into glowing binary and hex digits, purple and gold, mysterious scroll in background",
+   "seed": 1999
+  },
+  "detective": {
+   "art": "a 1940s film noir detective in a trench coat and fedora under a streetlamp in the rain, city at night, moody shadows",
+   "seed": 2036
+  },
+  "roast": {
+   "art": "a stand-up comedy stage with a microphone on a stand in a spotlight, flames in the background, red brick wall",
+   "seed": 2073
+  },
+  "beats": {
+   "art": "a music producer's studio with glowing keyboard, pads and studio monitors, purple neon, sound waves in the air",
+   "seed": 2110
+  },
+  "interview": {
+   "art": "a confident person in a smart outfit shaking hands across a desk in a bright modern office, city view",
+   "seed": 2147
+  },
+  "chess": {
+   "art": "a dramatic chess board mid-game with a rook in the spotlight, marble pieces, dark moody background with gold light",
+   "seed": 2184
+  },
+  "garden": {
+   "art": "a lush small backyard vegetable garden with raised beds, tomatoes and herbs, morning sunlight and dew",
+   "seed": 2221
+  },
+  "pets": {
+   "art": "a happy golden puppy and a curious tabby cat sitting together on a cozy rug, warm living room light",
+   "seed": 2258
+  },
+  "history": {
+   "art": "a swirling time portal with ancient Rome, a medieval castle and a steam locomotive blending together, epic sky",
+   "seed": 2295
+  },
+  "space": {
+   "art": "a person with a telescope on a hill under a brilliant Milky Way, planets visible, deep blue night",
+   "seed": 2332
+  },
+  "debate": {
+   "art": "two podiums facing each other on a stage with balanced golden scales above, dramatic spotlights",
+   "seed": 2369
+  },
+  "calm": {
+   "art": "a peaceful lake at dawn with soft mist, gentle floating bubbles and a person meditating on a wooden dock, pastel tones",
+   "seed": 2406
+  },
+  "prompter": {
+   "art": "an artist's paintbrush turning into glowing pixels that form a surreal colorful painting, creative explosion of color",
+   "seed": 2443
+  },
+  "deals": {
+   "art": "a shopping bag with glowing price tags and a magnifying glass comparing two gadgets, bright clean background",
+   "seed": 2480
+  },
+  "kids": {
+   "art": "a friendly cartoon owl wearing glasses helping a child with homework at a desk, colorful school supplies, cheerful",
+   "seed": 2517
+  }
+ }
+}

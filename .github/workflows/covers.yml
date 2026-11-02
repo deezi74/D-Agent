@@ -1,0 +1,39 @@
+name: Pal covers
+
+# Draws a banner picture for every Pal into docs/hub/covers and commits them.
+# Runs when the cover list changes, or by hand (Actions > Pal covers > Run workflow).
+on:
+  push:
+    branches: ["claude/**", main]
+    paths: ["scripts/covers.json", "scripts/gen-covers.py"]
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Pal ids to redraw (space separated); empty = only missing pictures"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  draw:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install --quiet pillow
+      - name: Draw
+        env:
+          POLLINATIONS_KEY: ${{ secrets.POLLINATIONS_KEY }}
+        run: |
+          if [ -n "${{ github.event.inputs.only }}" ]; then python3 scripts/gen-covers.py --force ${{ github.event.inputs.only }}; else python3 scripts/gen-covers.py; fi
+      - name: Commit pictures
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/hub/covers
+          git diff --cached --quiet && exit 0
+          git commit -m "Draw Pal cover pictures"
+          for i in 1 2 3 4; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0; sleep 5; done
+          exit 1
