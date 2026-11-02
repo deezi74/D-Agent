@@ -36,7 +36,7 @@ say "Downloading D-Agent PC..."
 curl -fsSL "$RAW/dagent_pc.py" -o "$SCRIPT.new"
 "$PY" -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$SCRIPT.new"
 mv -f "$SCRIPT.new" "$SCRIPT"
-pkill -f "dagent_pc.py" 2>/dev/null || true
+pkill -f "python[0-9.]* [^ ]*dagent_pc[.]py" 2>/dev/null || true
 
 if [ "$TERMUX" = 1 ]; then
   say "Setting up D-Agent PC on this phone..."
@@ -44,7 +44,7 @@ if [ "$TERMUX" = 1 ]; then
 #!/data/data/com.termux/files/usr/bin/bash
 # Starts D-Agent PC if it isn't running. Used by Termux:Boot and by the D-Agent app.
 command -v termux-wake-lock >/dev/null && termux-wake-lock
-if ! pgrep -f "dagent_pc.py" >/dev/null 2>&1; then
+if ! pgrep -f "python[0-9.]* [^ ]*dagent_pc[.]py" >/dev/null 2>&1; then
   cd "\$HOME"
   setsid nohup "$PY" "$SCRIPT" >/dev/null 2>&1 < /dev/null &
 fi
