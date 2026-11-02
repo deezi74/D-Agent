@@ -45,6 +45,16 @@ data class Situation(
 )
 
 object PromptBuilder {
+    private val TIME_Q = Regex("\\b(what time|the time|time is it|clock|o'?clock|how long (until|till|before|ago)|minutes? (until|till|left)|hours? (until|till|left)|right now|tonight|this (morning|afternoon|evening)|timer|alarm|remind)\\b", RegexOption.IGNORE_CASE)
+
+    /** True when the message needs the exact time (asked directly or for a timer, alarm or reminder). */
+    fun asksTime(text: String) = TIME_Q.containsMatchIn(text)
+
+    /** The note attached to such a message; kept out of the system prompt so local servers can reuse their cache. */
+    fun clockNote(now: ZonedDateTime, battery: String = ""): String =
+        "\n\n[Phone clock: " + now.format(DateTimeFormatter.ofPattern("h:mm a, EEEE, MMMM d, yyyy", Locale.US)) +
+            (if (battery.isNotBlank()) "; battery $battery" else "") + "]"
+
     fun build(
         persona: Persona,
         situation: Situation,
@@ -57,13 +67,15 @@ object PromptBuilder {
         append("\n\n# Voice\n").append(persona.styleText).append('\n')
         append("Answer in the language the person writes in. Use Markdown when it helps (lists, tables, code blocks), not for one-liners.\n")
 
+        // Only things that rarely change go here. The system prompt is the start of every request, and
+        // local servers (LM Studio, the phone) reuse their work on an unchanged start; a clock that ticks
+        // every minute would make them re-read the whole prompt and every tool on each message.
         append("\n# Right now\n")
-        append("- Local time: ").append(situation.now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy, h:mm a", Locale.US)))
+        append("- Today: ").append(situation.now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US)))
         append(" (").append(situation.now.zone.id).append(")\n")
         if (situation.place.isNotBlank()) append("- Approximate location: ").append(situation.place).append('\n')
         if (situation.device.isNotBlank()) append("- Phone: ").append(situation.device).append('\n')
-        if (situation.battery.isNotBlank()) append("- Battery: ").append(situation.battery).append('\n')
-        append("Use these facts when asked about the time, date or where the person is; never guess them. Do not recite them unprompted.\n")
+        append("When the person asks the time, the phone's clock is attached to their message; never guess it. Do not recite these facts unprompted.\n")
 
         if (persona.aboutUser.isNotBlank()) append("\n# About the person (written by them)\n").append(persona.aboutUser.trim()).append('\n')
         if (memory.isNotBlank()) append("\n# What you remember about them\n").append(memory).append('\n')

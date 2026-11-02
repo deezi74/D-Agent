@@ -269,7 +269,13 @@ class AgentRunner(private val g: Graph) {
                     maxTokens = if (isLocal) 2048 else 8192,
                 )
                 val loop = AgentLoop(client, provider.model, tools, options, guard(client, provider.model, isLocal, background = false))
-                val flow = loop.run(system, _state.value.session.messages, ctx)
+                // The exact time rides on the latest message only when it's needed (see PromptBuilder).
+                val sent = _state.value.session.messages.let { msgs ->
+                    val last = msgs.lastOrNull()
+                    if (last != null && last.role == Role.USER && PromptBuilder.asksTime(last.text)) msgs.dropLast(1) + last.copy(text = last.text + PromptBuilder.clockNote(situation.now, situation.battery))
+                    else msgs
+                }
+                val flow = loop.run(system, sent, ctx)
                 try {
                     flow.collect { ev ->
                         handle(ev) { finalText = it }
@@ -445,7 +451,7 @@ class AgentRunner(private val g: Graph) {
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
         val tools = tools(agentMode = true, vision = false).filterNot { it.name == "plan" }
-        val system = PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = g.linux.installed, agentMode = true), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
+        val system = PromptBuilder.clockNote(ZonedDateTime.now()).trim() + "\n\n" + PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = g.linux.installed, agentMode = true), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
             "\n\nThis is a scheduled task named \"$label\" running in the background. The person is not watching; do the work and finish with a short message for them. Do not ask questions."
         var session = ChatSession(title = "⏰ $label", messages = listOf(Msg.user(prompt)))
         var final = ""
@@ -471,7 +477,7 @@ class AgentRunner(private val g: Graph) {
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
         val tools = listOf<Tool>(WebSearchTool(g.search), WebFetchTool(g.http), RecallTool(g.memory))
-        val system = PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = false, agentMode = false), g.memory.forPrompt(), emptyList(), tools.map { it.name }.toSet())
+        val system = PromptBuilder.clockNote(ZonedDateTime.now()).trim() + "\n\n" + PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = false, agentMode = false), g.memory.forPrompt(), emptyList(), tools.map { it.name }.toSet())
         var final = ""
         val ctx = object : ToolContext { override val sessionId = "once" }
         AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = maxSteps), guard(client, provider.model, provider.id == Providers.LOCAL_ID, background = true)).run(system, listOf(Msg.user(prompt)), ctx).collect { ev ->
@@ -496,7 +502,7 @@ class AgentRunner(private val g: Graph) {
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
         val tools = tools(agentMode = prefs.agentMode || prefs.autoMode, vision = images.isNotEmpty()).filterNot { it.name == "plan" }
-        val system = PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = g.linux.installed, agentMode = prefs.agentMode || prefs.autoMode), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
+        val system = PromptBuilder.clockNote(ZonedDateTime.now()).trim() + "\n\n" + PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = g.linux.installed, agentMode = prefs.agentMode || prefs.autoMode), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
             "\n\n" + note
         var session = sessionId?.let { g.chats.load(it) } ?: ChatSession(title = title)
         session = session.copy(messages = (session.messages + Msg.user(prompt, images)).takeLast(60), updated = System.currentTimeMillis())

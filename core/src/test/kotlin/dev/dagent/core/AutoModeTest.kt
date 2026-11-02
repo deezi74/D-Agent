@@ -55,3 +55,15 @@ class NoThinkTest {
         org.junit.Assert.assertFalse(sys("gpt-4o", think = false).contains("enable_thinking"))
     }
 }
+
+class StablePromptTest {
+    @org.junit.Test fun systemPromptDoesNotTickAndClockRidesOnTimeQuestions() {
+        val p = dev.dagent.core.agent.Persona()
+        val a = dev.dagent.core.agent.PromptBuilder.build(p, dev.dagent.core.agent.Situation(now = java.time.ZonedDateTime.parse("2026-11-02T03:01:00-05:00[America/Chicago]")), "", emptyList(), emptySet())
+        val b = dev.dagent.core.agent.PromptBuilder.build(p, dev.dagent.core.agent.Situation(now = java.time.ZonedDateTime.parse("2026-11-02T03:47:00-05:00[America/Chicago]")), "", emptyList(), emptySet())
+        org.junit.Assert.assertEquals(a, b)
+        org.junit.Assert.assertTrue(dev.dagent.core.agent.PromptBuilder.asksTime("what time is it"))
+        org.junit.Assert.assertTrue(dev.dagent.core.agent.PromptBuilder.asksTime("set an alarm for 6"))
+        org.junit.Assert.assertFalse(dev.dagent.core.agent.PromptBuilder.asksTime("write me a poem about dogs"))
+    }
+}
