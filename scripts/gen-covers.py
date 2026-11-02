@@ -8,13 +8,16 @@ root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 cfg = json.load(open(os.path.join(root, "scripts", "covers.json")))
 out = os.path.join(root, "docs", "hub", "covers")
 os.makedirs(out, exist_ok=True)
-force = "--force" in sys.argv
+# Bump when the look changes: every cover is redrawn once.
+VERSION = "2"
+vfile = os.path.join(out, "VERSION")
+force = "--force" in sys.argv or (open(vfile).read().strip() if os.path.exists(vfile) else "") != VERSION
 only = [a for a in sys.argv[1:] if not a.startswith("--")]
 key = os.environ.get("POLLINATIONS_KEY", "")
 
 def fetch(prompt, seed):
     url = "https://image.pollinations.ai/prompt/" + urllib.parse.quote(prompt) + \
-        f"?width=1152&height=600&seed={seed}&model=flux&nologo=true&private=true"
+        f"?width=1152&height=720&seed={seed}&model=flux&nologo=true&private=true"
     for attempt in range(10):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "D-Agent-covers"})
@@ -39,6 +42,9 @@ for pid, c in cfg["covers"].items():
         failed.append(pid); continue
     img = Image.open(io.BytesIO(data)).convert("RGB")
     w, h = img.size
+    # Cut off the bottom strip, where the free image service stamps its name.
+    img = img.crop((0, 0, w, int(h * 0.88)))
+    w, h = img.size
     target = 768 / 400
     if w / h > target:
         nw = int(h * target); img = img.crop(((w - nw) // 2, 0, (w - nw) // 2 + nw, h))
@@ -46,4 +52,5 @@ for pid, c in cfg["covers"].items():
         nh = int(w / target); img = img.crop((0, (h - nh) // 2, w, (h - nh) // 2 + nh))
     img.resize((768, 400), Image.LANCZOS).save(path, "WEBP", quality=82, method=6)
     if not key: time.sleep(18)
+if not failed and not only: open(vfile, "w").write(VERSION)
 print("done; missing:", ", ".join(failed) if failed else "none")
