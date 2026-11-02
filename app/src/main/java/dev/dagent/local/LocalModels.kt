@@ -17,7 +17,7 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/** A GGUF model the app suggests. Sizes are the exact Q4_K_M file sizes on Hugging Face. */
+/** A GGUF model the app suggests. Sizes are the exact file sizes on Hugging Face (checked 2026-11-02). */
 data class CatalogModel(
     val id: String,
     val name: String,
@@ -46,37 +46,37 @@ data class HfFile(val repo: String, val path: String, val bytes: Long) {
  */
 class LocalModels(private val context: Context) {
     val catalog = listOf(
-        CatalogModel("qwen3-0.6b", "Qwen3 0.6B", "Qwen", "bartowski/Qwen_Qwen3-0.6B-GGUF", "Qwen_Qwen3-0.6B-Q4_K_M.gguf", 484_220_320, 3, "Fastest",
-            "Runs on any phone and answers almost instantly. Handles simple tool calls like the flashlight or a timer."),
-        CatalogModel("llama32-1b", "Llama 3.2 1B Instruct", "Meta", "bartowski/Llama-3.2-1B-Instruct-GGUF", "Llama-3.2-1B-Instruct-Q4_K_M.gguf", 807_694_464, 3, "Tiny",
-            "Small and quick for everyday chat on any phone."),
-        CatalogModel("gemma3-1b", "Gemma 3 1B", "Google", "bartowski/google_gemma-3-1b-it-GGUF", "google_gemma-3-1b-it-Q4_K_M.gguf", 806_058_496, 4, "Light writer",
-            "Quick and friendly for chatting and writing. Less dependable with multi-step tool use."),
-        CatalogModel("qwen3-1.7b", "Qwen3 1.7B", "Qwen", "bartowski/Qwen_Qwen3-1.7B-GGUF", "Qwen_Qwen3-1.7B-Q4_K_M.gguf", 1_282_439_584, 4, "Best balance",
-            "The best pick for most phones. Reliable with tools, web search and phone controls, and thinks before it answers."),
-        CatalogModel("granite33-2b", "Granite 3.3 2B Instruct", "IBM", "bartowski/ibm-granite_granite-3.3-2b-instruct-GGUF", "ibm-granite_granite-3.3-2b-instruct-Q4_K_M.gguf", 1_545_303_616, 4, "Tool user",
-            "Small and good at using tools."),
-        CatalogModel("llama32-3b", "Llama 3.2 3B Instruct", "Meta", "bartowski/Llama-3.2-3B-Instruct-GGUF", "Llama-3.2-3B-Instruct-Q4_K_M.gguf", 2_019_377_696, 6, "All-rounder",
-            "Balanced chat and tools. Good on 6 GB phones."),
-        CatalogModel("qwen2.5-3b", "Qwen2.5 3B Instruct", "Qwen", "bartowski/Qwen2.5-3B-Instruct-GGUF", "Qwen2.5-3B-Instruct-Q4_K_M.gguf", 1_929_903_264, 6, "Snappy agent",
-            "Strong at tool calling with no thinking pause, so replies start sooner. Good on 6 GB phones."),
-        CatalogModel("qwen3-4b", "Qwen3 4B", "Qwen", "bartowski/Qwen_Qwen3-4B-GGUF", "Qwen_Qwen3-4B-Q4_K_M.gguf", 2_497_280_960, 8, "Smartest for 8 GB",
-            "Noticeably smarter research and planning. Slower, so best on phones with 8 GB of RAM or more."),
-        CatalogModel("gemma3-4b", "Gemma 3 4B", "Google", "bartowski/google_gemma-3-4b-it-GGUF", "google_gemma-3-4b-it-Q4_K_M.gguf", 2_489_758_112, 8, "Best writing",
-            "Great general knowledge and natural writing. Tool use is decent; Qwen3 4B is better at it."),
-        CatalogModel("phi4-mini", "Phi-4 mini Instruct", "Microsoft", "bartowski/microsoft_Phi-4-mini-instruct-GGUF", "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf", 2_491_874_688, 8, "Math and logic",
-            "Good at reasoning and math."),
-        CatalogModel("qwen3-8b", "Qwen3 8B", "Qwen", "bartowski/Qwen_Qwen3-8B-GGUF", "Qwen_Qwen3-8B-Q4_K_M.gguf", 5_027_784_224, 12, "Flagship only",
+        CatalogModel("lfm25-1.2b", "LFM2.5 1.2B Instruct", "Liquid AI", "LiquidAI/LFM2.5-1.2B-Instruct-GGUF", "LFM2.5-1.2B-Instruct-Q4_K_M.gguf", 730_895_168, 3, "Fastest",
+            "Built for phones: a hybrid design that replies very fast on the phone's CPU and handles simple tools (flashlight, timers, quick lookups)."),
+        CatalogModel("qwen35-0.8b", "Qwen3.5 0.8B", "Qwen", "bartowski/Qwen_Qwen3.5-0.8B-GGUF", "Qwen_Qwen3.5-0.8B-Q4_K_M.gguf", 579_615_840, 3, "Tiny",
+            "The smallest of the 2026 Qwen family. Runs on any phone next to other apps."),
+        CatalogModel("qwen35-2b", "Qwen3.5 2B", "Qwen", "bartowski/Qwen_Qwen3.5-2B-GGUF", "Qwen_Qwen3.5-2B-Q4_K_M.gguf", 1_396_198_496, 4, "Best balance",
+            "The best pick for most phones. Newer and smarter than Qwen3 1.7B, reliable with tools, web search and phone controls."),
+        CatalogModel("lfm25-2.6b", "LFM2.5 2.6B", "Liquid AI", "LiquidAI/LFM2.5-2.6B-GGUF", "LFM2.5-2.6B-Q4_K_M.gguf", 1_674_455_040, 4, "Quick agent",
+            "Fast like the 1.2B but noticeably smarter. Answers without a thinking pause, so replies start sooner."),
+        CatalogModel("gemma4-e2b", "Gemma 4 E2B", "Google", "bartowski/google_gemma-4-E2B-it-GGUF", "google_gemma-4-E2B-it-Q4_K_M.gguf", 3_462_680_032, 6, "Natural writer",
+            "Google's 2026 phone model with built-in tool calling. Great general knowledge and natural writing."),
+        CatalogModel("qwen35-4b", "Qwen3.5 4B", "Qwen", "bartowski/Qwen_Qwen3.5-4B-GGUF", "Qwen_Qwen3.5-4B-Q4_K_M.gguf", 3_013_027_808, 8, "Smartest for 8 GB",
+            "Much stronger research and planning. Best on phones with 8 GB of RAM or more."),
+        CatalogModel("nemotron-bolt-e4b", "Nemotron 3.5 Bolt E4B", "NVIDIA", "unsloth/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF", "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q4_K_XL.gguf", 5_060_482_240, 8, "Best tool user",
+            "NVIDIA's October 2026 assistant model, tuned from Gemma 4 for fast, multi-step tool use. Needs 8 GB of RAM or more."),
+        CatalogModel("gemma4-e4b", "Gemma 4 E4B", "Google", "bartowski/google_gemma-4-E4B-it-GGUF", "google_gemma-4-E4B-it-Q4_K_M.gguf", 5_405_170_144, 8, "Best writing",
+            "The bigger Gemma 4 phone model: the most natural chat and writing here. Tools work well; Nemotron Bolt is better at them."),
+        CatalogModel("qwen35-9b", "Qwen3.5 9B", "Qwen", "bartowski/Qwen_Qwen3.5-9B-GGUF", "Qwen_Qwen3.5-9B-Q4_K_M.gguf", 6_169_341_984, 12, "Flagship only",
             "Closest to a cloud model. Needs 12 GB of RAM or more and patience; expect a few words per second."),
+        CatalogModel("qwen3-1.7b", "Qwen3 1.7B (2025)", "Qwen", "bartowski/Qwen_Qwen3-1.7B-GGUF", "Qwen_Qwen3-1.7B-Q4_K_M.gguf", 1_282_439_584, 4, "Older",
+            "Last year's balance pick. Qwen3.5 2B replaces it."),
+        CatalogModel("qwen3-4b", "Qwen3 4B (2025)", "Qwen", "bartowski/Qwen_Qwen3-4B-GGUF", "Qwen_Qwen3-4B-Q4_K_M.gguf", 2_497_280_960, 8, "Older",
+            "Last year's 8 GB pick. Qwen3.5 4B replaces it."),
     )
 
     /** The model D-Agent suggests for this phone's memory. */
     fun best(): CatalogModel {
         val gb = totalRamGb()
         val id = when {
-            gb >= 7.5 -> "qwen3-4b"
-            gb >= 3.6 -> "qwen3-1.7b"
-            else -> "qwen3-0.6b"
+            gb >= 7.5 -> "qwen35-4b"
+            gb >= 3.6 -> "qwen35-2b"
+            else -> "lfm25-1.2b"
         }
         return catalog.first { it.id == id }
     }

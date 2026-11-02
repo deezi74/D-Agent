@@ -46,4 +46,12 @@ class NoThinkTest {
         assertFalse(sys("qwen3-30b-a3b-instruct-2507", think = false).contains("/no_think"))
         assertFalse(sys("llama-3.2-3b", think = false).contains("/no_think"))
     }
+
+    @org.junit.Test fun onPhoneServerTurnsThinkingOff() {
+        val local = dev.dagent.core.llm.OpenAiClient(okhttp3.OkHttpClient(), "http://127.0.0.1:${dev.dagent.core.llm.Providers.LOCAL_PORT}/v1", "", emptyMap(), dev.dagent.core.llm.ReasoningStyle.NONE)
+        fun body(think: Boolean) = local.buildBody(dev.dagent.core.llm.ChatRequest("local", "Be nice.", listOf(Msg.user("hi")), think = think)).toString()
+        org.junit.Assert.assertTrue(body(false).contains("\"enable_thinking\":false"))
+        org.junit.Assert.assertFalse(body(true).contains("enable_thinking"))
+        org.junit.Assert.assertFalse(sys("gpt-4o", think = false).contains("enable_thinking"))
+    }
 }

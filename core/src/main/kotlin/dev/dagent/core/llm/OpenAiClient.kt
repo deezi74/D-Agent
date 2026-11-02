@@ -127,6 +127,8 @@ class OpenAiClient(
         if (llamaServer) {
             put("return_progress", true)
             put("cache_prompt", true)
+            // Qwen3.5, Gemma 4 and Nemotron Bolt templates take a thinking switch; templates without one ignore it.
+            if (!req.think) putJsonObject("chat_template_kwargs") { put("enable_thinking", false) }
         }
         req.temperature?.let { put("temperature", it) }
         if (req.think) when (reasoning) {
