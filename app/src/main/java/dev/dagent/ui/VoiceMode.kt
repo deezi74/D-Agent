@@ -82,7 +82,13 @@ fun VoiceMode(g: Graph, onClose: () -> Unit) {
     val look by g.character.active.collectAsState()
     val speaker = g.speaker
     val listener = remember { Listener(context) }
-    val heard by listener.state.collectAsState()
+    val ears = g.ears
+    val earsId = prefs.listenEngine
+    val earsReady = remember(earsId) { ears.ready(earsId) }
+    val onPhone = earsId != "android" && earsReady
+    val heardAndroid by listener.state.collectAsState()
+    val heardPhone by ears.state.collectAsState()
+    val heard = if (onPhone) heardPhone else heardAndroid
     var phase by remember { mutableStateOf(Phase.PAUSED) }
     var sentAt by remember { mutableIntStateOf(-1) }
     var quietTries by remember { mutableIntStateOf(0) }
@@ -103,11 +109,26 @@ fun VoiceMode(g: Graph, onClose: () -> Unit) {
         else cameraPermission.launch(Manifest.permission.CAMERA)
     }
 
+    fun stopEars() {
+        listener.stop()
+        ears.stop()
+    }
+
     fun listen() {
         speaker.stop()
         note = null
         phase = Phase.LISTENING
-        listener.start()
+        if (onPhone) ears.start(earsId) else listener.start()
+    }
+
+    /** While the reply plays, listen for the person talking over it (on-phone listening only). */
+    fun listenOver() {
+        if (!onPhone || !prefs.talkOver) return
+        ears.start(earsId, talkOver = true) {
+            speaker.stop()
+            note = null
+            phase = Phase.LISTENING
+        }
     }
 
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
@@ -115,7 +136,7 @@ fun VoiceMode(g: Graph, onClose: () -> Unit) {
     }
 
     fun begin() {
-        if (!listener.available()) {
+        if (!onPhone && !listener.available()) {
             note = "No speech recognizer on this phone. Install or turn on Google speech services."
             return
         }
@@ -123,10 +144,13 @@ fun VoiceMode(g: Graph, onClose: () -> Unit) {
         else micPermission.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    LaunchedEffect(Unit) { begin() }
+    LaunchedEffect(Unit) {
+        if (onPhone) ears.warm(earsId)
+        begin()
+    }
     DisposableEffect(Unit) {
         onDispose {
-            listener.stop()
+            stopEars()
             speaker.stop()
         }
     }
@@ -136,7 +160,7 @@ fun VoiceMode(g: Graph, onClose: () -> Unit) {
         when (val h = heard) {
             is Listener.State.Heard -> {
                 quietTries = 0
-                listener.stop()
+                stopEars()
                 phase = Phase.THINKING
                 sentAt = state.session.messages.size
                 if (cameraOn) {
@@ -178,6 +202,7 @@ fun VoiceMode(g: Graph, onClose: () -> Unit) {
         sentAt = -1
         phase = Phase.SPEAKING
         speaker.speak(reply) { scope.launch { if (phase == Phase.SPEAKING) listen() } }
+        listenOver()
     }
 
     val pulse = rememberInfiniteTransition(label = "pulse").animateFloat(
@@ -224,7 +249,7 @@ fun VoiceMode(g: Graph, onClose: () -> Unit) {
             when (phase) {
                 Phase.LISTENING -> "Listening..."
                 Phase.THINKING -> state.live.values.lastOrNull { it.running }?.title ?: "Thinking..."
-                Phase.SPEAKING -> "Speaking · tap to interrupt"
+                Phase.SPEAKING -> if (onPhone && prefs.talkOver) "Speaking · just talk to interrupt" else "Speaking · tap to interrupt"
                 Phase.PAUSED -> "Paused"
             },
             color = if (phase == Phase.PAUSED) p.muted else p.accent, fontSize = 16.sp,
@@ -248,14 +273,15 @@ fun VoiceMode(g: Graph, onClose: () -> Unit) {
                 if (phase == Phase.LISTENING) Icons.Default.Mic else Icons.Default.MicOff, "Talk",
                 if (phase == Phase.LISTENING) p.accent else p.surface2, if (phase == Phase.LISTENING) Color(0xFF1A0E08) else p.text, 76.dp,
             ) {
-                if (phase == Phase.LISTENING) { listener.stop(); phase = Phase.PAUSED } else begin()
+                if (phase == Phase.LISTENING) { stopEars(); phase = Phase.PAUSED } else begin()
             }
             Spacer(Modifier.size(56.dp))
         }
         Spacer(Modifier.height(8.dp))
         Text(
             if (cameraOn) "Live camera: each time you talk it sees what you show it (needs a model that can see images)."
-            else "Hands-free: it listens again after each answer. Voice: " + (if (g.cloudVoice.active()) prefs.voiceName else "phone") + ".",
+            else "Hands-free: it listens again after each answer. " + (if (onPhone) "Listening on the phone (offline). " else "") +
+                "Voice: " + voiceLabel(g, prefs) + ".",
             color = p.muted, fontSize = 12.sp, textAlign = TextAlign.Center,
         )
     }
@@ -266,4 +292,14 @@ private fun CircleButton(icon: ImageVector, label: String, bg: Color, tint: Colo
     Box(Modifier.size(size).clip(CircleShape).background(bg).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(icon, label, tint = tint)
     }
+}
+
+/** A short name for the voice in use, for captions and Settings. */
+fun voiceLabel(g: Graph, prefs: dev.dagent.data.AppPrefs): String {
+    val pack = dev.dagent.core.voice.VoicePacks.byId(prefs.voiceProvider)
+    if (pack != null && g.neuralVoice.handles(pack.id)) {
+        val v = pack.voices.firstOrNull { it.id.toString() == prefs.voiceName }?.label?.substringBefore(" (") ?: pack.voices.first().label.substringBefore(" (")
+        return "${pack.name} · $v"
+    }
+    return if (g.cloudVoice.active()) prefs.voiceName else "phone"
 }

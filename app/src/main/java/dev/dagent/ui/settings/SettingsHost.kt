@@ -51,7 +51,7 @@ private fun Home(g: Graph, open: (String) -> Unit, back: () -> Unit) {
     Page("Settings", back) {
         NavRow(Icons.Default.Face, "${prefs.persona.name}: look and personality", "Name, character, picture, colors, about you") { open("persona") }
         NavRow(Icons.Default.Cloud, "AI providers", "${provider.preset.name} · ${provider.model}") { open("providers") }
-        NavRow(Icons.Default.RecordVoiceOver, "Voice", if (prefs.voiceProvider == "phone") "Phone voice · set up a free natural voice" else "Natural voice · ${prefs.voiceName}") { open("voice") }
+        NavRow(Icons.Default.RecordVoiceOver, "Voice", if (prefs.voiceProvider == "phone") "Phone voice · get a free on-phone voice" else "Voice · " + dev.dagent.ui.voiceLabel(g, prefs)) { open("voice") }
         NavRow(Icons.Default.Hub, "Connectors", "Your PC, email, GitHub, Telegram, Termux, calls") { open("connectors") }
         NavRow(Icons.Default.PhoneAndroid, "On-phone models", "Offline AI with GGUF models") { open("local") }
         NavRow(Icons.Default.Terminal, "Linux computer", when (linux) {

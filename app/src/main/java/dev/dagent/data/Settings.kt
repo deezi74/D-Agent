@@ -44,6 +44,12 @@ data class AppPrefs(
     val defaultSim: Int = 0, // 0 phone default, 1 or 2
     val voiceProvider: String = "phone",
     val voiceName: String = "coral",
+    /** "android" (Google speech) or an on-phone listening pack id such as "moonshine-tiny". */
+    val listenEngine: String = "android",
+    /** Talk over the reply to interrupt it (on-phone listening only). */
+    val talkOver: Boolean = true,
+    /** Speed of the on-phone voices (0.7 to 1.4). */
+    val voiceSpeed: Float = 1.0f,
 )
 
 /** Plain preferences in one file; API keys in an encrypted one. */
@@ -91,6 +97,9 @@ class Settings(context: Context) {
         defaultSim = prefs.getInt("sim", 0),
         voiceProvider = prefs.getString("voice.provider", "phone")!!,
         voiceName = prefs.getString("voice.name", "coral")!!,
+        listenEngine = prefs.getString("voice.listen", "android")!!,
+        talkOver = prefs.getBoolean("voice.talkover", true),
+        voiceSpeed = prefs.getFloat("voice.speed", 1.0f),
     )
 
     fun update(block: (AppPrefs) -> AppPrefs) {
@@ -118,6 +127,9 @@ class Settings(context: Context) {
             .putInt("sim", n.defaultSim)
             .putString("voice.provider", n.voiceProvider)
             .putString("voice.name", n.voiceName)
+            .putString("voice.listen", n.listenEngine)
+            .putBoolean("voice.talkover", n.talkOver)
+            .putFloat("voice.speed", n.voiceSpeed)
             .apply()
         _state.value = n
     }

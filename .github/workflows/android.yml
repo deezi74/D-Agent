@@ -72,6 +72,9 @@ jobs:
           path: deps/llama-out/libllamaserver.so
           key: llama-server-${{ env.LLAMA_TAG }}-${{ hashFiles('scripts/build-llama-server.sh') }}
 
+      - name: Voice engine (sherpa-onnx)
+        run: bash scripts/fetch-sherpa.sh app/libs
+
       - name: Core tests
         run: ./gradlew --no-daemon :core:test
 

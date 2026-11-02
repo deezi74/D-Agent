@@ -69,7 +69,16 @@ class Graph(val context: Context) {
     val skills = SkillLibrary(File(context.filesDir, "skills"))
     val interactions = Interactions(context)
     val cloudVoice = CloudVoice(settings, context.cacheDir, http)
-    val speaker by lazy { Speaker(context, cloudVoice) }
+    val voicePacks = dev.dagent.core.voice.VoicePackStore(File(context.filesDir, "voices"), http)
+    val neuralVoice = dev.dagent.phone.NeuralVoice(voicePacks)
+    val voiceDownloads = dev.dagent.phone.VoiceDownloads(voicePacks)
+    val ears by lazy { dev.dagent.phone.OnPhoneEars(voicePacks) }
+    val speaker by lazy {
+        Speaker(context, cloudVoice, neuralVoice) {
+            val s = settings.current
+            if (neuralVoice.handles(s.voiceProvider)) Speaker.Pick(s.voiceProvider, s.voiceName.toIntOrNull() ?: 0, s.voiceSpeed) else null
+        }
+    }
     val phone = PhoneActions(context, interactions, { settings.current.confirmRisky }, { speaker.say(it) }, { settings.current.defaultSim })
     val bridge = PhoneBridge { action, args -> phone.run(action, args) }.also { it.start() }
     val linux = LinuxComputer(context, workspace.root, skills.dir, bridge, http).also { if (it.installed) it.configure() }

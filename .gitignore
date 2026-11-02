@@ -12,3 +12,4 @@ app/release/
 *.keystore
 keystore.properties
 deps/
+app/libs/

@@ -78,6 +78,8 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    // sherpa-onnx (Apache-2.0): on-phone voices and listening. CI downloads the AAR (scripts/fetch-sherpa.sh).
+    implementation(files("libs/sherpa-onnx.aar"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

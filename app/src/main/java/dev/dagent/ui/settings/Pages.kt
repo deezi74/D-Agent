@@ -704,6 +704,8 @@ fun VoicePage(g: Graph, back: () -> Unit) {
     var eleven by remember { mutableStateOf(g.settings.secret(Settings.ELEVENLABS_KEY)) }
     var status by remember { mutableStateOf("") }
     Page("Voice", { g.settings.setSecret(Settings.ELEVENLABS_KEY, eleven); back() }) {
+        OnPhoneVoiceSection(g)
+        Section("More voices")
         Card {
             Muted("The free natural voice runs in your Termux app at no cost and with no key (it uses Microsoft Edge's online voices, so it needs internet). Tap below once; it installs and starts it.")
             Button({

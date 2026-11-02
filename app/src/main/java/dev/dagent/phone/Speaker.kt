@@ -21,7 +21,16 @@ import java.util.Locale
  * MP3 speech sentence by sentence, fetching the next part while the current one
  * plays; otherwise, or if the cloud voice fails, it uses the phone's TTS engine.
  */
-class Speaker(context: Context, private val cloud: CloudVoice? = null) {
+class Speaker(
+    context: Context,
+    private val cloud: CloudVoice? = null,
+    private val neural: NeuralVoice? = null,
+    /** The on-phone voice to use right now, or null for cloud/phone voices. */
+    private val pick: () -> Pick? = { null },
+) {
+    /** An on-phone voice pack, the speaker number inside it and the talking speed. */
+    data class Pick(val pack: String, val voice: Int, val speed: Float)
+
     /** Reads [text] aloud (used by read-aloud, the phone tool and the speaker button). */
     fun say(text: String) { scope.launch { speak(text) } }
 
@@ -91,11 +100,45 @@ class Speaker(context: Context, private val cloud: CloudVoice? = null) {
             done()
             return
         }
+        val on = pick()
+        if (neural != null && on != null) {
+            speakNeural(on, clean, done)
+            return
+        }
         if (cloud != null && cloud.active()) {
             speakCloud(clean, done)
             return
         }
         speakPhone(clean, done)
+    }
+
+    /** On-phone voice: makes the next sentence while the current one plays. */
+    private fun speakNeural(on: Pick, clean: String, done: () -> Unit) {
+        stop()
+        val parts = sentences(clean, first = 90, rest = 260)
+        cloudJob = scope.launch {
+            _speaking.value = true
+            var spoken = 0
+            try {
+                var next = async { neural!!.synth(on.pack, on.voice, on.speed, parts[0]) }
+                for (i in parts.indices) {
+                    val (pcm, rate) = next.await()
+                    if (i + 1 < parts.size) next = async { neural!!.synth(on.pack, on.voice, on.speed, parts[i + 1]) }
+                    neural!!.play(pcm, rate)
+                    spoken = i + 1
+                }
+                _speaking.value = false
+                _voiceError.value = ""
+                done()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                _speaking.value = false
+                throw e
+            } catch (e: Throwable) {
+                _voiceError.value = e.message ?: "The on-phone voice failed"
+                val rest = parts.drop(spoken).joinToString(" ")
+                if (rest.isBlank()) { _speaking.value = false; done() } else speakPhone(rest, done)
+            }
+        }
     }
 
     private fun speakCloud(clean: String, done: () -> Unit) {
@@ -181,6 +224,7 @@ class Speaker(context: Context, private val cloud: CloudVoice? = null) {
         pending = null
         cloudJob?.cancel()
         cloudJob = null
+        neural?.stopPlayback()
         player?.let { runCatching { it.stop() }; runCatching { it.release() } }
         player = null
         tts.stop()
@@ -209,12 +253,12 @@ class Speaker(context: Context, private val cloud: CloudVoice? = null) {
          * Splits text into parts for the cloud voice: a short first part so speech
          * starts fast, then about 350 characters each, cut at sentence ends.
          */
-        fun sentences(text: String): List<String> {
+        fun sentences(text: String, first: Int = 140, rest: Int = 350): List<String> {
             val pieces = Regex("(?<=[.!?])\\s+").split(text).filter { it.isNotBlank() }
             val out = ArrayList<String>()
             val cur = StringBuilder()
             for (p in pieces) {
-                val limit = if (out.isEmpty()) 140 else 350
+                val limit = if (out.isEmpty()) first else rest
                 if (cur.isNotEmpty() && cur.length + p.length + 1 > limit) {
                     out += cur.toString()
                     cur.clear()
