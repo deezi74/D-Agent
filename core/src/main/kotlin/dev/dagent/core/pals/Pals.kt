@@ -48,7 +48,17 @@ data class Pal(
     val author: String = "D-Agent",
     val version: Int = 1,
     val builtin: Boolean = false,
-)
+    /** Banner picture: a full https link, or a path inside D's Hub (covers/<id>.webp). */
+    val cover: String = "",
+    /** Longer "about" text for the Pal's page. */
+    val description: String = "",
+    /** "" or "free" = free; "premium" for paid plans later. */
+    val price: String = "",
+    /** When it was added (YYYY-MM-DD). */
+    val created: String = "",
+) {
+    val premium: Boolean get() = price.equals("premium", ignoreCase = true)
+}
 
 /** D's Hub list: what the app and the website read. */
 @Serializable
@@ -77,6 +87,10 @@ object PalFormat {
         instructions = p.instructions.take(MAX_TEXT),
         starters = p.starters.map { it.take(200) }.filter { it.isNotBlank() }.take(6),
         tags = p.tags.map { it.take(24) }.take(8),
+        description = p.description.take(4000),
+        cover = p.cover.trim().takeIf { c -> c.startsWith("https://") || (c.matches(Regex("[A-Za-z0-9_./-]{1,120}")) && ".." !in c && !c.startsWith("/")) }.orEmpty(),
+        price = p.price.trim().lowercase().take(16),
+        created = p.created.take(10),
         builtin = false,
     )
 

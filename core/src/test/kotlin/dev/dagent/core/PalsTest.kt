@@ -30,6 +30,9 @@ class PalsTest {
         assertEquals("evil", weird.id)
         assertEquals("X", weird.name)
         assertEquals(listOf("a", "b"), weird.starters)
+        assertEquals("", PalFormat.decode("""{"id":"x","name":"X","cover":"../../etc/passwd"}""").cover)
+        assertEquals("covers/x.webp", PalFormat.decode("""{"id":"x","name":"X","cover":"covers/x.webp","price":"Premium"}""").cover)
+        assertTrue(PalFormat.decode("""{"id":"x","name":"X","price":"Premium"}""").premium)
     }
 
     @Test fun storeKeepsBuiltinsAndMine() {
@@ -62,6 +65,9 @@ class PalsTest {
         assertEquals(ids.size, ids.toSet().size)
         assertTrue(ids.none { id -> BuiltinPals.all.any { it.id == id } })
         assertTrue(hub.pals.all { it.instructions.isNotBlank() && it.starters.isNotEmpty() })
+        assertTrue(hub.pals.all { it.cover.isNotBlank() && it.description.length > 40 })
+        val art = java.io.File(f.parentFile.parentFile.parentFile, "scripts/covers.json").readText()
+        assertTrue((hub.pals.map { it.id } + BuiltinPals.all.map { it.id }).all { art.contains("\"$it\"") })
     }
 
     @Test fun roleGoesIntoThePrompt() {

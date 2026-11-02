@@ -37,16 +37,31 @@
   .tools input { flex: 1 1 240px; background: var(--surface); border: 1px solid var(--line); color: var(--text); border-radius: 12px; padding: 11px 14px; font-size: 15px; }
   .tag { background: var(--surface2); border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 8px 14px; font-size: 14px; cursor: pointer; }
   .tag.on { background: var(--accent); color: #1a0e08; border-color: var(--accent); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding-bottom: 48px; }
-  .pal { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
-  .pal .top { display: flex; gap: 12px; align-items: center; }
-  .face { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; flex: none; }
-  .pal h3 { margin: 0; font-size: 18px; }
-  .pal .by { color: var(--muted); font-size: 13px; }
-  .pal p { margin: 0; font-size: 14px; }
-  .starters { display: flex; flex-direction: column; gap: 6px; }
-  .starters div { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font-size: 13px; color: var(--muted); }
-  .pal .row { display: flex; gap: 8px; margin-top: auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; padding-bottom: 48px; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr 1fr; gap: 10px; } }
+  .pal { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 8px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: transform .15s, border-color .15s; }
+  .pal:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .cover { position: relative; aspect-ratio: 768 / 400; border-radius: 14px; overflow: hidden; display: grid; place-items: center; font-size: 34px; }
+  .cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .badge { position: absolute; top: 6px; right: 6px; background: #7fe0c4; color: #101318; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 8px; }
+  .badge.premium { background: #b9a8ff; }
+  .pal h3 { margin: 4px 4px 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pal .by { color: var(--muted); font-size: 12px; margin: 0 4px; }
+  .pal p { margin: 0 4px; font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .pal .chip { margin: 4px; font-size: 11px; color: var(--text); }
+  .pal .chip span { border: 1px solid var(--muted); border-radius: 8px; padding: 2px 8px; margin-right: 6px; }
+  dialog { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 22px; padding: 0; width: min(560px, calc(100% - 24px)); max-height: 90vh; }
+  dialog::backdrop { background: rgba(0,0,0,.7); }
+  .sheet { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .sheet .cover { font-size: 56px; }
+  .sheet h3 { margin: 0; font-size: 24px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-radius: 14px; padding: 12px 0; text-align: center; }
+  .stats b { display: block; font-size: 18px; }
+  .stats span { color: var(--muted); font-size: 12px; }
+  .sheet h4 { margin: 4px 0 0; font-size: 17px; }
+  .sheet .try div { background: var(--surface); border-radius: 12px; padding: 10px 12px; margin-top: 6px; font-size: 14px; }
+  .sheet .actions { display: flex; gap: 8px; position: sticky; bottom: 0; background: var(--bg); padding-top: 8px; }
+  .sheet .actions .small.primary { flex: 1; padding: 14px; font-size: 16px; }
   .small { padding: 9px 14px; font-size: 14px; border-radius: 999px; border: 0; cursor: pointer; font-weight: 700; }
   .small.primary { background: var(--accent); color: #1a0e08; }
   .small.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
@@ -88,6 +103,7 @@
     </div>
     <div class="tools" id="tags"></div>
     <div class="grid" id="grid"><div class="note">Loading Pals…</div></div>
+    <dialog id="sheet"></dialog>
   </section>
 
   <footer>
@@ -109,40 +125,88 @@
     var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = p.id + ".dpal"; a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
+  var cats = [
+    ["All", function () { return true; }],
+    ["Free", function (p) { return (p.price || "") !== "premium"; }],
+    ["Security", function (p) { return has(p, ["hack", "security", "ctf", "bug bounty", "recon", "malware", "reverse", "decod", "crypto", "blue team", "network", "wireshark", "owasp", "mobile"]); }],
+    ["Fun", function (p) { return has(p, ["fun", "games", "comedy", "music", "story"]); }],
+    ["Learning", function (p) { return has(p, ["learning", "thinking", "language"]); }],
+    ["Creative", function (p) { return has(p, ["creative", "ai", "video", "music", "story", "content"]); }],
+    ["Everyday", function (p) { return !cats[2][1](p) && !cats[3][1](p); }],
+    ["Premium", function (p) { return p.price === "premium"; }]
+  ];
+  function has(p, keys) { return (p.tags || []).some(function (t) { t = t.toLowerCase(); return keys.some(function (k) { return t.indexOf(k) >= 0; }); }); }
+  function cover(p, big) {
+    var c = el("div", "cover", p.emoji || "✨");
+    var col = hex(p.color || 0xFF2A2F3A);
+    c.style.background = "linear-gradient(135deg," + col + "," + col + "88 55%,#0b0d12)";
+    var img = new Image(); img.alt = ""; img.loading = "lazy";
+    img.src = "hub/" + (p.cover || ("covers/" + p.id + ".webp"));
+    img.onerror = function () { img.remove(); };
+    c.appendChild(img);
+    if (!big) { var b = el("span", "badge" + (p.price === "premium" ? " premium" : ""), p.price === "premium" ? "Premium" : "Free"); c.appendChild(b); }
+    return c;
+  }
+  function date(d) { var x = (d || "").split("-"); return x.length === 3 ? (+x[1]) + "/" + (+x[2]) + "/" + x[0] : "—"; }
+  var sheet = document.getElementById("sheet");
+  function openPal(p) {
+    sheet.innerHTML = "";
+    var s = el("div", "sheet");
+    s.appendChild(cover(p, true));
+    var head = el("div"); head.appendChild(el("h3", "", (p.emoji || "") + " " + p.name));
+    head.appendChild(el("div", "by", "by " + (p.author || "D-Agent") + " · " + (p.price === "premium" ? "Premium" : "Free")));
+    s.appendChild(head);
+    var st = el("div", "stats");
+    [[String((p.starters || []).length), "Starters"], ["v" + (p.version || 1), "Version"], [date(p.created), "Added"]].forEach(function (x) {
+      var d = el("div"); d.appendChild(el("b", "", x[0])); d.appendChild(el("span", "", x[1])); st.appendChild(d);
+    });
+    s.appendChild(st);
+    s.appendChild(el("h4", "", "Description"));
+    s.appendChild(el("p", "", p.description || p.tagline || ""));
+    if (p.starters && p.starters.length) {
+      s.appendChild(el("h4", "", "Try asking"));
+      var t = el("div", "try"); p.starters.forEach(function (x) { t.appendChild(el("div", "", "“" + x + "”")); }); s.appendChild(t);
+    }
+    if (p.tags && p.tags.length) s.appendChild(el("div", "by", p.tags.map(function (x) { return "#" + x; }).join("   ")));
+    var row = el("div", "actions");
+    var close = el("button", "small ghost", "Close"); close.onclick = function () { sheet.close(); };
+    var get = el("button", "small primary", "⬇  Get free (.dpal)"); get.onclick = function () { file(p); };
+    row.appendChild(close); row.appendChild(get); s.appendChild(row);
+    sheet.appendChild(s);
+    sheet.showModal();
+  }
+  sheet.addEventListener("click", function (e) { if (e.target === sheet) sheet.close(); });
   function render() {
     var term = q.value.trim().toLowerCase();
+    var cat = cats.filter(function (c) { return c[0] === (tag || "All"); })[0];
     var shown = all.filter(function (p) {
-      var hay = [p.name, p.tagline, (p.tags || []).join(" ")].join(" ").toLowerCase();
-      return (!term || hay.indexOf(term) >= 0) && (!tag || (p.tags || []).indexOf(tag) >= 0);
+      var hay = [p.name, p.tagline, p.description, (p.tags || []).join(" ")].join(" ").toLowerCase();
+      return (!term || hay.indexOf(term) >= 0) && cat[1](p);
     });
     grid.innerHTML = "";
-    if (!shown.length) { grid.appendChild(el("div", "note", "No Pals match.")); return; }
+    if (!shown.length) { grid.appendChild(el("div", "note", tag === "Premium" ? "Premium Pals are coming later. Everything is free for now." : "No Pals match.")); return; }
     shown.forEach(function (p) {
-      var card = el("div", "pal");
-      var top = el("div", "top");
-      var face = el("div", "face", p.emoji || "✨"); face.style.background = hex(p.color || 0xFF2A2F3A);
-      var names = el("div"); names.appendChild(el("h3", "", p.name)); names.appendChild(el("div", "by", "by " + (p.author || "D-Agent") + " · free"));
-      top.appendChild(face); top.appendChild(names); card.appendChild(top);
+      var card = el("div", "pal"); card.tabIndex = 0;
+      card.onclick = function () { openPal(p); };
+      card.onkeydown = function (e) { if (e.key === "Enter") openPal(p); };
+      card.appendChild(cover(p));
+      card.appendChild(el("h3", "", (p.emoji || "") + " " + p.name));
+      card.appendChild(el("div", "by", "by " + (p.author || "D-Agent")));
       card.appendChild(el("p", "", p.tagline || ""));
-      if (p.starters && p.starters.length) {
-        var st = el("div", "starters");
-        p.starters.slice(0, 3).forEach(function (s) { st.appendChild(el("div", "", "“" + s + "”")); });
-        card.appendChild(st);
+      if (p.tags && p.tags.length) {
+        var ch = el("div", "chip"); ch.appendChild(el("span", "", p.tags[0]));
+        if (p.tags.length > 1) ch.appendChild(document.createTextNode("+" + (p.tags.length - 1)));
+        card.appendChild(ch);
       }
-      var row = el("div", "row");
-      var get = el("button", "small primary", "Download Pal"); get.onclick = function () { file(p); };
-      row.appendChild(get);
-      card.appendChild(row);
       grid.appendChild(card);
     });
   }
   function renderTags() {
-    var seen = {};
-    all.forEach(function (p) { (p.tags || []).forEach(function (t) { seen[t] = (seen[t] || 0) + 1; }); });
     tags.innerHTML = "";
-    [""].concat(Object.keys(seen).sort()).forEach(function (t) {
-      var b = el("button", "tag" + (t === tag ? " on" : ""), t ? "#" + t : "All");
-      b.onclick = function () { tag = t; renderTags(); render(); };
+    cats.forEach(function (c) {
+      var on = c[0] === (tag || "All");
+      var b = el("button", "tag" + (on ? " on" : ""), (on ? "✓ " : "") + c[0]);
+      b.onclick = function () { tag = c[0]; renderTags(); render(); };
       tags.appendChild(b);
     });
   }

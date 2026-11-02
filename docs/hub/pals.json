@@ -24,7 +24,10 @@
    "sampling": {
     "temperature": 0.3
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Helps with Android modding on phones you own: unlocking bootloaders, ADB and fastboot, flashing custom ROMs and recoveries, Magisk/KernelSU root, Termux setups and fixing boot loops. Exact commands for Windows, Linux, Android and ChromeOS, with the risk of each step and a backup first.",
+   "cover": "covers/rom.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "skillet",
@@ -48,7 +51,10 @@
    "sampling": {
     "temperature": 0.7
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "A practical home cook that turns what's in your fridge into real meals, plans a week of dinners on a budget, and builds the grocery list for you. Swaps for allergies and diets, step-by-step cooking help.",
+   "cover": "covers/skillet.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "rep",
@@ -72,7 +78,10 @@
    "sampling": {
     "temperature": 0.6
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "An encouraging fitness coach that builds workouts for your level, with or without a gym, tracks your progress and adjusts the plan as you get stronger. Form tips, warm-ups and rest days included.",
+   "cover": "covers/rep.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "wrench",
@@ -97,7 +106,10 @@
    "sampling": {
     "temperature": 0.4
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Helps people fix cars and things around the house.",
+   "cover": "covers/wrench.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "ledger",
@@ -121,7 +133,10 @@
    "sampling": {
     "temperature": 0.4
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Helps with personal and small-business money: budgets, saving goals, paying down debt, tracking spending and side-income ideas.",
+   "cover": "covers/ledger.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "story",
@@ -144,7 +159,10 @@
    "version": 1,
    "sampling": {
     "temperature": 1.0
-   }
+   },
+   "description": "A creative writing partner for stories, lyrics, characters, worlds and image prompts. Brainstorms with you, writes drafts, and keeps your voice.",
+   "cover": "covers/story.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "lingo",
@@ -168,7 +186,10 @@
    "sampling": {
     "temperature": 0.6
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "A friendly language tutor: chat in the language you're learning, get gentle corrections, new words in context and quick quizzes.",
+   "cover": "covers/lingo.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "trip",
@@ -190,7 +211,10 @@
    "version": 1,
    "sampling": {
     "temperature": 0.6
-   }
+   },
+   "description": "Plans trips day by day: itineraries, rough costs, transport, where to stay, what to pack and local tips, all fitted to your budget and pace.",
+   "cover": "covers/trip.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "quest",
@@ -214,7 +238,10 @@
    "sampling": {
     "temperature": 0.9
    },
-   "style": "witty"
+   "style": "witty",
+   "description": "A fun game master for text adventures, trivia nights and party games. Builds the world, plays every character and keeps score.",
+   "cover": "covers/quest.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "shorts",
@@ -239,7 +266,10 @@
    "sampling": {
     "temperature": 0.85
    },
-   "style": "witty"
+   "style": "witty",
+   "description": "Writes short-form video content: scroll-stopping hooks in the first 2 seconds, tight 15-60 second scripts with on-screen text and shot ideas, captions, hashtags and calls to action.",
+   "cover": "covers/shorts.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "ctf",
@@ -264,7 +294,10 @@
    "sampling": {
     "temperature": 0.4
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Coaches capture-the-flag practice: web, crypto, forensics, reverse engineering, pwn and OSINT challenges on platforms like picoCTF, Hack The Box, TryHackMe and OverTheWire.",
+   "cover": "covers/ctf.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "homelab",
@@ -289,7 +322,10 @@
    "sampling": {
     "temperature": 0.3
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Helps build and run a safe practice lab for ethical hacking: Kali or Parrot in a VM, VirtualBox/VMware/Proxmox, intentionally vulnerable targets (Metasploitable, DVWA, Juice Shop, VulnHub boxes), an isolated host-only network, snapshots, and a Kali NetHunter or Termux setup on Android.",
+   "cover": "covers/homelab.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "recon",
@@ -314,7 +350,10 @@
    "sampling": {
     "temperature": 0.3
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Helps with authorized bug bounty and pentest work: reading program scope and rules, passive recon, subdomain and port discovery (nmap, amass, subfinder, httpx), organizing findings, judging severity with CVSS, and writing clear reports with steps to reproduce and impact.",
+   "cover": "covers/recon.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "webtest",
@@ -339,7 +378,10 @@
    "sampling": {
     "temperature": 0.3
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Teaches web application security: the OWASP Top 10, how XSS, SQL injection, SSRF, IDOR, CSRF and auth bugs work, using Burp Suite (Community is free), and working through PortSwigger Web Security Academy, Juice Shop and DVWA labs.",
+   "cover": "covers/webtest.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "packets",
@@ -364,7 +406,10 @@
    "sampling": {
     "temperature": 0.3
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Helps read network traffic and secure networks: Wireshark and tcpdump filters, reading pcaps, spotting suspicious traffic, DNS and TLS basics, router and Wi-Fi hardening, and testing the strength of your own Wi-Fi with the aircrack-ng suite.",
+   "cover": "covers/packets.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "reverse",
@@ -389,7 +434,10 @@
    "sampling": {
     "temperature": 0.3
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Teaches reverse engineering and safe malware analysis: Ghidra, radare2, strings and file, x64dbg, reading assembly, decompiling Android APKs with jadx and apktool, and analyzing samples only inside an isolated VM with snapshots and no shared folders.",
+   "cover": "covers/reverse.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "blueteam",
@@ -414,7 +462,10 @@
    "sampling": {
     "temperature": 0.3
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Helps defenders: reading Windows Event Logs, Sysmon and Linux auth logs, writing Sigma and YARA rules, setting up a free SIEM lab (Wazuh, Security Onion, Elastic), triaging alerts, and running incident response step by step (contain, collect, eradicate, recover, lessons learned).",
+   "cover": "covers/blueteam.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "cyberdeck",
@@ -439,7 +490,10 @@
    "sampling": {
     "temperature": 0.4
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Helps design and build a cyberdeck: Raspberry Pi 5 or an Android phone as the brain, screens, keyboards, batteries and cases, an offline AI running on the deck (llama.cpp, D-Agent on the phone), SDR and LoRa radios, and a portable ethical hacking toolkit.",
+   "cover": "covers/cyberdeck.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "droidsec",
@@ -464,7 +518,10 @@
    "sampling": {
     "temperature": 0.3
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Teaches Android security testing: the OWASP MASVS/MASTG, static analysis with MobSF, jadx and apktool, dynamic testing with Frida and objection, adb and logcat, intercepting app traffic with Burp or mitmproxy and a user CA on a rooted test phone or emulator, checking for insecure storage, exported components, weak crypto and hardcoded keys, and practice apps like InsecureBankv2, DIVA and the OWASP UnCrackable apps.",
+   "cover": "covers/droidsec.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "decoder",
@@ -489,7 +546,10 @@
    "sampling": {
     "temperature": 0.2
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Decodes and explains encoded data step by step, like a CyberChef recipe: Base64, hex, binary, URL encoding, JWTs, ROT13/Caesar, Vigenère, XOR, Morse, and identifying hash types for CTFs and your own data.",
+   "cover": "covers/decoder.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "detective",
@@ -514,7 +574,10 @@
    "sampling": {
     "temperature": 0.9
    },
-   "style": "witty"
+   "style": "witty",
+   "description": "An interactive mystery game: you're the detective. It sets the scene, plays every suspect with their own secrets, hands out fair clues and lets you make the accusation.",
+   "cover": "covers/detective.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "roast",
@@ -538,7 +601,10 @@
    "sampling": {
     "temperature": 1.0
    },
-   "style": "witty"
+   "style": "witty",
+   "description": "A quick-witted comedian: friendly roasts, jokes, terrible puns, toasts and short stand-up bits. Funny, never cruel.",
+   "cover": "covers/roast.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "beats",
@@ -562,7 +628,10 @@
    "sampling": {
     "temperature": 0.9
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "A music producer and songwriter: lyrics and hooks, chord progressions, drum patterns and BPM for any genre, plus FL Studio, BandLab and mixing tips.",
+   "cover": "covers/beats.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "interview",
@@ -586,7 +655,10 @@
    "sampling": {
     "temperature": 0.5
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "A career coach: realistic mock interviews with feedback, resumes and cover letters matched to the job post, and salary negotiation prep.",
+   "cover": "covers/interview.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "chess",
@@ -610,7 +682,10 @@
    "sampling": {
     "temperature": 0.4
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "A chess coach: openings with the ideas behind them, tactics puzzles, game reviews from your PGN, a study plan for your rating, or a game against you.",
+   "cover": "covers/chess.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "garden",
@@ -634,7 +709,10 @@
    "sampling": {
     "temperature": 0.5
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "Helps with plants and gardens: what to grow for your area and season, indoor plant care, watering and light, soil and compost, pests and diseases (ask for a photo and describe what you see), raised beds and small-space growing, and harvest timing.",
+   "cover": "covers/garden.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "pets",
@@ -658,7 +736,10 @@
    "sampling": {
     "temperature": 0.5
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "Helps with dogs, cats and other pets: training plans with positive reinforcement, food and treats, behavior problems, new-pet checklists, grooming, and travel.",
+   "cover": "covers/pets.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "history",
@@ -682,7 +763,10 @@
    "sampling": {
     "temperature": 0.7
    },
-   "style": "witty"
+   "style": "witty",
+   "description": "Makes history come alive: events explained simply, interviews with historical figures, what-if scenarios and quizzes, with facts kept apart from legend.",
+   "cover": "covers/history.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "space",
@@ -706,7 +790,10 @@
    "sampling": {
     "temperature": 0.6
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "An astronomy guide: what you can see in tonight's sky, phone astrophotography settings, picking a first telescope, and big questions explained simply.",
+   "cover": "covers/space.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "debate",
@@ -730,7 +817,10 @@
    "sampling": {
     "temperature": 0.7
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "A sharp but fair debate partner: argues either side, steelmans views you disagree with, spots fallacies and scores the round.",
+   "cover": "covers/debate.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "calm",
@@ -753,7 +843,10 @@
    "sampling": {
     "temperature": 0.7
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "Helps you relax and reflect with guided breathing, sleep stories, journaling prompts and calm, kind conversation.",
+   "cover": "covers/calm.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "prompter",
@@ -777,7 +870,10 @@
    "sampling": {
     "temperature": 0.9
    },
-   "style": "witty"
+   "style": "witty",
+   "description": "Writes prompts for AI image, video and music generators (including D-Agent's own Imagine and video tools, Flux, SDXL, Pollinations).",
+   "cover": "covers/prompter.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "deals",
@@ -801,7 +897,10 @@
    "sampling": {
     "temperature": 0.4
    },
-   "style": "straight"
+   "style": "straight",
+   "description": "Helps you shop smart: compare products by what actually matters, find cheaper or used alternatives, explain specs in plain words, spot fake-review signs, time purchases around sales, and build a budget shopping list.",
+   "cover": "covers/deals.webp",
+   "created": "2026-11-02"
   },
   {
    "id": "kids",
@@ -825,7 +924,10 @@
    "sampling": {
     "temperature": 0.5
    },
-   "style": "warm"
+   "style": "warm",
+   "description": "Helps kids with homework in a patient, friendly way.",
+   "cover": "covers/kids.webp",
+   "created": "2026-11-02"
   }
  ]
 }

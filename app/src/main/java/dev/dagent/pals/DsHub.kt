@@ -44,3 +44,10 @@ class DsHub(private val http: OkHttpClient, private val cache: File) {
         )
     }
 }
+
+/** Where a Pal's banner picture lives (its own link, or D's Hub's covers folder). */
+fun coverUrl(pal: dev.dagent.core.pals.Pal): String = when {
+    pal.cover.startsWith("https://") -> pal.cover
+    pal.cover.isNotBlank() -> DsHub.SITE + "hub/" + pal.cover
+    else -> DsHub.SITE + "hub/covers/" + pal.id + ".webp"
+}

@@ -141,7 +141,7 @@ private fun PalCard(g: Graph, pal: Pal, selected: Boolean, open: (String) -> Uni
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PalFace(pal, 44)
+            PalThumb(pal)
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(pal.name, color = p.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text(pal.tagline, color = p.muted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -268,56 +268,4 @@ private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {
     val p = LocalPalette.current
     Text(label, color = if (on) Color(0xFF1A0E08) else p.text, fontSize = 13.sp,
         modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) p.accent else p.bg).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp))
-}
-
-/** D's Hub: Pals shared by the D-Agent community. No account needed to browse and install. */
-@Composable
-fun HubPage(g: Graph, back: () -> Unit) {
-    val p = LocalPalette.current
-    val context = LocalContext.current
-    var pals by remember { mutableStateOf<List<Pal>?>(null) }
-    var error by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf("") }
-    var version by remember { mutableIntStateOf(0) }
-    var reload by remember { mutableIntStateOf(0) }
-    LaunchedEffect(reload) {
-        error = ""
-        runCatching { g.hub.load(force = reload > 0) }.onSuccess { pals = it.pals }.onFailure { error = it.message ?: "Couldn't load D's Hub." }
-    }
-    Page("D's Hub", back) {
-        Muted("Pals made by the D-Agent community. Install any of them for free. Sign-in and sharing your own straight to the Hub are coming later; for now, share a Pal as a file from the Pals page.")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton({ reload++ }) { Text("Refresh") }
-            TextButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DsHub.SITE)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }) { Text("Open the website") }
-        }
-        OutlinedTextField(filter, { filter = it }, label = { Text("Search Pals") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        if (error.isNotBlank()) Text(error, color = p.bad, fontSize = 13.sp)
-        val list = pals
-        if (list == null && error.isBlank()) Muted("Loading…")
-        val shown = list.orEmpty().filter { pal -> filter.isBlank() || listOf(pal.name, pal.tagline, pal.tags.joinToString(" ")).any { it.contains(filter, ignoreCase = true) } }
-        shown.forEach { pal ->
-            val have = remember(version, pal.id) { g.pals.get(pal.id) }
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(p.surface).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    PalFace(pal, 44)
-                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                        Text(pal.name, color = p.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        Text("by ${pal.author} · free", color = p.muted, fontSize = 12.sp)
-                    }
-                }
-                Text(pal.tagline, color = p.text, fontSize = 13.sp)
-                if (pal.tags.isNotEmpty()) Muted(pal.tags.joinToString("  ") { "#$it" })
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (have == null || (!have.builtin && have.version < pal.version)) {
-                        Button({ val saved = g.pals.install(pal); g.settings.update { it.copy(activePal = saved.id) }; version++ }, colors = ButtonDefaults.buttonColors(containerColor = p.accent)) {
-                            Text(if (have == null) "Get free" else "Update")
-                        }
-                    } else {
-                        OutlinedButton({ g.settings.update { it.copy(activePal = have.id) }; back() }) { Text("Use") }
-                    }
-                }
-            }
-        }
-        if (list != null && list.isEmpty()) Muted("No Pals in the Hub yet.")
-    }
 }
