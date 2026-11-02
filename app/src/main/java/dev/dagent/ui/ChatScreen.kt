@@ -191,7 +191,9 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
                         color = if (state.running) p.accent else p.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
-                ModeSwitch(prefs.agentMode) { on -> g.settings.update { it.copy(agentMode = on) } }
+                ModeSwitch(if (prefs.autoMode) "auto" else if (prefs.agentMode) "agent" else "chat", state.running && prefs.autoMode, state.usingAgent) { m ->
+                    g.settings.update { it.copy(autoMode = m == "auto", agentMode = if (m == "auto") it.agentMode else m == "agent") }
+                }
                 IconButton(openDiscover) { Icon(Icons.Default.Explore, "Discover: feed, goals and ideas", tint = p.text) }
                 IconButton(openVoice) { Icon(Icons.Default.GraphicEq, "Voice mode", tint = p.accent) }
                 IconButton({ g.runner.newChat() }) { Icon(Icons.Default.Edit, "New chat", tint = p.text) }
@@ -199,7 +201,7 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
 
             Box(Modifier.weight(1f)) {
                 if (state.session.messages.isEmpty() && !state.running) {
-                    EmptyChat(prefs.persona.name, prefs.avatarPath, prefs.persona.userName, prefs.agentMode, look) { input = it }
+                    EmptyChat(prefs.persona.name, prefs.avatarPath, prefs.persona.userName, prefs.agentMode || prefs.autoMode, look) { input = it }
                 } else {
                     Transcript(g, state)
                 }
@@ -234,16 +236,18 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
 }
 
 @Composable
-private fun ModeSwitch(agent: Boolean, onChange: (Boolean) -> Unit) {
+private fun ModeSwitch(mode: String, working: Boolean, usingAgent: Boolean, onChange: (String) -> Unit) {
     val p = LocalPalette.current
     Row(Modifier.clip(RoundedCornerShape(20.dp)).background(p.surface2).padding(3.dp)) {
-        listOf(false to "Chat", true to "Agent").forEach { (value, label) ->
-            val on = value == agent
+        listOf("auto" to "Auto", "chat" to "Chat", "agent" to "Agent").forEach { (value, label) ->
+            val on = value == mode
+            // While Auto is working, show which way it went ("Auto·Agent").
+            val shown = if (on && value == "auto" && working) (if (usingAgent) "Auto·Agent" else "Auto·Chat") else label
             Text(
-                label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                shown, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
                 color = if (on) Color(0xFF1A0E08) else p.muted,
                 modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(if (on) p.accent else Color.Transparent)
-                    .clickable { onChange(value) }.padding(horizontal = 12.dp, vertical = 6.dp),
+                    .clickable { onChange(value) }.padding(horizontal = 9.dp, vertical = 6.dp),
             )
         }
     }

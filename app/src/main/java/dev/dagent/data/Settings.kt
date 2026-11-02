@@ -27,6 +27,8 @@ data class ProviderConfig(
 data class AppPrefs(
     val providerId: String = "freellmapi",
     val agentMode: Boolean = true,
+    /** Pick Chat or Agent per message (the default). */
+    val autoMode: Boolean = true,
     val think: Boolean = false,
     val persona: Persona = Persona(),
     val avatarPath: String = "",
@@ -67,6 +69,7 @@ class Settings(context: Context) {
     private fun load() = AppPrefs(
         providerId = prefs.getString("provider", "freellmapi")!!,
         agentMode = prefs.getBoolean("agentMode", true),
+        autoMode = prefs.getBoolean("autoMode", true),
         think = prefs.getBoolean("think", false),
         persona = Persona(
             name = prefs.getString("p.name", "D")!!,
@@ -95,6 +98,7 @@ class Settings(context: Context) {
         prefs.edit()
             .putString("provider", n.providerId)
             .putBoolean("agentMode", n.agentMode)
+            .putBoolean("autoMode", n.autoMode)
             .putBoolean("think", n.think)
             .putString("p.name", n.persona.name)
             .putString("p.style", n.persona.style)

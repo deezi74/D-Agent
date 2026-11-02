@@ -40,6 +40,8 @@ import dev.dagent.core.agent.SkillTool
 import dev.dagent.core.agent.Tool
 import dev.dagent.core.agent.ToolContext
 import dev.dagent.core.agent.Guard
+import dev.dagent.core.agent.AutoMode
+import dev.dagent.core.agent.MoreToolsTool
 import dev.dagent.core.agent.LlmReviewer
 import dev.dagent.core.llm.ImagePart
 import dev.dagent.core.llm.LlmClient
@@ -96,6 +98,8 @@ data class ChatState(
     val live: Map<String, LiveTool> = emptyMap(),
     val plan: List<PlanBoard.Step> = emptyList(),
     val notice: String = "",
+    /** What Auto picked for the current run. */
+    val usingAgent: Boolean = false,
     val error: String = "",
 )
 
@@ -217,31 +221,14 @@ class AgentRunner(private val g: Graph) {
                 2 -> false
                 else -> !isLocal && VISION.containsMatchIn(provider.model.lowercase())
             }
-            // Small on-phone models read the whole prompt on the CPU before answering, so they get a
-            // short list of slimmed tools instead of every tool's full description.
-            val tools = tools(prefs.agentMode, vision).let { all ->
-                if (!isLocal) all
-                else all.filter { it.name in (if (prefs.agentMode) SlimTool.PHONE_AGENT else SlimTool.PHONE_CHAT) }.map { SlimTool(it) }
-            }
             refreshPlace()
-            val situation = Situation(
-                now = ZonedDateTime.now(),
-                place = place,
-                device = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}",
-                battery = runCatching { g.phone.battery() }.getOrDefault(""),
-                linuxReady = g.linux.installed,
-                canSeeImages = vision,
-                agentMode = prefs.agentMode,
-                modelName = provider.model,
-            )
-            val system = PromptBuilder.build(prefs.persona, situation, g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) + vaultNote(tools)
-            val options = AgentOptions(
-                maxSteps = if (prefs.agentMode) 40 else 6,
-                think = prefs.think,
-                contextChars = if (isLocal) (prefs.localContext * 3) else 240_000,
-                maxTokens = if (isLocal) 2048 else 8192,
-            )
-            val loop = AgentLoop(client, provider.model, tools, options, guard(client, provider.model, isLocal, background = false))
+            // Chat or Agent: the person's pick, or (Auto) chosen per message. Chat can still move
+            // itself up to Agent mid-turn with the more_tools tool.
+            val history = _state.value.session.messages
+            val lastUser = history.lastOrNull { it.role == Role.USER }?.text.orEmpty()
+            val typed = lastUser.substringBefore("\n\n[Attached:")
+            val fileCount = Regex("\\[Attached: ([^\\]]*)\\]").find(lastUser)?.groupValues?.get(1)?.split(", ")?.count { !it.endsWith(".jpg") } ?: 0
+            var agentMode = if (prefs.autoMode) AutoMode.decide(typed, fileCount, history.dropLast(1)).agent else prefs.agentMode
             val ctx = object : ToolContext {
                 override val sessionId: String get() = _state.value.session.id
                 override fun progress(text: String) {
@@ -253,7 +240,46 @@ class AgentRunner(private val g: Graph) {
                 override suspend fun confirm(title: String, detail: String) = g.interactions.confirm(title, detail)
             }
             var finalText = ""
-            loop.run(system, _state.value.session.messages, ctx).collect { ev -> handle(ev) { finalText = it } }
+            var round = 0
+            while (true) {
+                round++
+                var escalate = false
+                _state.update { it.copy(usingAgent = agentMode) }
+                // Small on-phone models read the whole prompt on the CPU before answering, so they get a
+                // short list of slimmed tools instead of every tool's full description.
+                val tools = tools(agentMode, vision).let { all ->
+                    if (!isLocal) all
+                    else all.filter { it.name in (if (agentMode) SlimTool.PHONE_AGENT else SlimTool.PHONE_CHAT) }.map { SlimTool(it) }
+                }.let { if (!agentMode && prefs.autoMode) it + MoreToolsTool { escalate = true } else it }
+                val situation = Situation(
+                    now = ZonedDateTime.now(),
+                    place = place,
+                    device = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}",
+                    battery = runCatching { g.phone.battery() }.getOrDefault(""),
+                    linuxReady = g.linux.installed,
+                    canSeeImages = vision,
+                    agentMode = agentMode,
+                    modelName = provider.model,
+                )
+                val system = PromptBuilder.build(prefs.persona, situation, g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) + vaultNote(tools)
+                val options = AgentOptions(
+                    maxSteps = if (agentMode) 40 else 6,
+                    think = prefs.think,
+                    contextChars = if (isLocal) (prefs.localContext * 3) else 240_000,
+                    maxTokens = if (isLocal) 2048 else 8192,
+                )
+                val loop = AgentLoop(client, provider.model, tools, options, guard(client, provider.model, isLocal, background = false))
+                val flow = loop.run(system, _state.value.session.messages, ctx)
+                try {
+                    flow.collect { ev ->
+                        handle(ev) { finalText = it }
+                        // Stop the chat-mode run right after more_tools answers; the next round has every tool.
+                        if (escalate && ev is AgentEvent.Message && ev.msg.role == Role.TOOL) throw Escalate()
+                    }
+                } catch (_: Escalate) { }
+                if (escalate && !agentMode && round < 3) { agentMode = true; continue }
+                break
+            }
             if (prefs.readAloud && finalText.isNotBlank()) g.speaker.say(finalText)
             if (!g.interactions.uiVisible && finalText.isNotBlank()) notifyDone(finalText)
         } catch (e: CancellationException) {
@@ -469,8 +495,8 @@ class AgentRunner(private val g: Graph) {
             g.local.ensureRunning(file, prefs.localContext, prefs.localThreads)
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
-        val tools = tools(agentMode = prefs.agentMode, vision = images.isNotEmpty()).filterNot { it.name == "plan" }
-        val system = PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = g.linux.installed, agentMode = prefs.agentMode), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
+        val tools = tools(agentMode = prefs.agentMode || prefs.autoMode, vision = images.isNotEmpty()).filterNot { it.name == "plan" }
+        val system = PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = g.linux.installed, agentMode = prefs.agentMode || prefs.autoMode), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
             "\n\n" + note
         var session = sessionId?.let { g.chats.load(it) } ?: ChatSession(title = title)
         session = session.copy(messages = (session.messages + Msg.user(prompt, images)).takeLast(60), updated = System.currentTimeMillis())
@@ -565,4 +591,9 @@ class AgentRunner(private val g: Graph) {
     companion object {
         private val VISION = Regex("gpt-4o|gpt-4\\.1|gpt-5|o3|o4|claude|gemini|grok-4|grok-2-vision|vision|-vl|llava|pixtral|gemma-3|gemma3|llama-4|openrouter/auto|mistral-medium|mistral-small")
     }
+}
+
+/** Ends a chat-mode run early when the model asks for the Agent tools. */
+private class Escalate : RuntimeException() {
+    override fun fillInStackTrace(): Throwable = this
 }
