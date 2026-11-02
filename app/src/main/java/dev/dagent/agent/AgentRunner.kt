@@ -253,7 +253,7 @@ class AgentRunner(private val g: Graph) {
                 }.let { if (!agentMode && prefs.autoMode) it + MoreToolsTool { escalate = true } else it }
                 val situation = Situation(
                     now = ZonedDateTime.now(),
-                    place = place,
+                    place = whereNow(),
                     device = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}",
                     battery = runCatching { g.phone.battery() }.getOrDefault(""),
                     linuxReady = g.linux.installed,
@@ -265,7 +265,8 @@ class AgentRunner(private val g: Graph) {
                 val options = AgentOptions(
                     maxSteps = if (agentMode) 40 else 6,
                     think = prefs.think,
-                    contextChars = if (isLocal) (prefs.localContext * 3) else 240_000,
+                    // A home PC usually runs a 8-16K context; start small enough and shrink further if it says so.
+                    contextChars = if (isLocal) (prefs.localContext * 3) else if (Providers.isLan(provider.baseUrl)) 36_000 else 240_000,
                     maxTokens = if (isLocal) 2048 else 8192,
                 )
                 val loop = AgentLoop(client, provider.model, tools, options, guard(client, provider.model, isLocal, background = false))
@@ -362,8 +363,20 @@ class AgentRunner(private val g: Graph) {
         }
     }
 
+    @Volatile private var home: Pair<String, GeoPoint?>? = null
+
+    /** The phone's location; with location off, the home address from Settings > Connectors > My details. */
     private val locate: suspend () -> GeoPoint? = {
         runCatching { g.phone.currentLocation(ask = g.interactions.uiVisible)?.let { GeoPoint(it.latitude, it.longitude) } }.getOrNull()
+            ?: g.connectors.myAddress.trim().takeIf { it.isNotBlank() }?.let { addr ->
+                home?.takeIf { it.first == addr }?.second
+                    ?: runCatching { g.places.geocode(addr) }.getOrNull()?.also { home = addr to it }
+            }
+    }
+
+    /** What the prompt says about where the person is. */
+    private fun whereNow(): String = place.ifBlank {
+        g.connectors.myAddress.trim().takeIf { it.isNotBlank() }?.let { "home address on file: $it (the phone's location is off)" }.orEmpty()
     }
 
     private fun tools(agentMode: Boolean, vision: Boolean): List<Tool> {
@@ -451,7 +464,7 @@ class AgentRunner(private val g: Graph) {
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
         val tools = tools(agentMode = true, vision = false).filterNot { it.name == "plan" }
-        val system = PromptBuilder.clockNote(ZonedDateTime.now()).trim() + "\n\n" + PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = g.linux.installed, agentMode = true), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
+        val system = PromptBuilder.clockNote(ZonedDateTime.now()).trim() + "\n\n" + PromptBuilder.build(prefs.persona, Situation(place = whereNow(), linuxReady = g.linux.installed, agentMode = true), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
             "\n\nThis is a scheduled task named \"$label\" running in the background. The person is not watching; do the work and finish with a short message for them. Do not ask questions."
         var session = ChatSession(title = "⏰ $label", messages = listOf(Msg.user(prompt)))
         var final = ""
@@ -477,7 +490,7 @@ class AgentRunner(private val g: Graph) {
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
         val tools = listOf<Tool>(WebSearchTool(g.search), WebFetchTool(g.http), RecallTool(g.memory))
-        val system = PromptBuilder.clockNote(ZonedDateTime.now()).trim() + "\n\n" + PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = false, agentMode = false), g.memory.forPrompt(), emptyList(), tools.map { it.name }.toSet())
+        val system = PromptBuilder.clockNote(ZonedDateTime.now()).trim() + "\n\n" + PromptBuilder.build(prefs.persona, Situation(place = whereNow(), linuxReady = false, agentMode = false), g.memory.forPrompt(), emptyList(), tools.map { it.name }.toSet())
         var final = ""
         val ctx = object : ToolContext { override val sessionId = "once" }
         AgentLoop(client, provider.model, tools, AgentOptions(maxSteps = maxSteps), guard(client, provider.model, provider.id == Providers.LOCAL_ID, background = true)).run(system, listOf(Msg.user(prompt)), ctx).collect { ev ->
@@ -502,7 +515,7 @@ class AgentRunner(private val g: Graph) {
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
         val tools = tools(agentMode = prefs.agentMode || prefs.autoMode, vision = images.isNotEmpty()).filterNot { it.name == "plan" }
-        val system = PromptBuilder.clockNote(ZonedDateTime.now()).trim() + "\n\n" + PromptBuilder.build(prefs.persona, Situation(place = place, linuxReady = g.linux.installed, agentMode = prefs.agentMode || prefs.autoMode), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
+        val system = PromptBuilder.clockNote(ZonedDateTime.now()).trim() + "\n\n" + PromptBuilder.build(prefs.persona, Situation(place = whereNow(), linuxReady = g.linux.installed, agentMode = prefs.agentMode || prefs.autoMode), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) +
             "\n\n" + note
         var session = sessionId?.let { g.chats.load(it) } ?: ChatSession(title = title)
         session = session.copy(messages = (session.messages + Msg.user(prompt, images)).takeLast(60), updated = System.currentTimeMillis())

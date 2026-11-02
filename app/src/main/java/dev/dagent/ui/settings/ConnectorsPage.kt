@@ -75,7 +75,7 @@ private fun DetailsSection(g: Graph) {
         OutlinedTextField(name, { name = it; g.connectors.myName = it }, label = { Text("Your name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(phone, { phone = it; g.connectors.myPhone = it }, label = { Text("Phone") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(email, { email = it; g.connectors.myEmail = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(address, { address = it; g.connectors.myAddress = it }, label = { Text("Delivery address") }, minLines = 2, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(address, { address = it; g.connectors.myAddress = it }, label = { Text("Home address (also used for weather and places)") }, minLines = 2, modifier = Modifier.fillMaxWidth())
     }
 }
 

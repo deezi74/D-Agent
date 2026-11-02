@@ -72,7 +72,19 @@ sealed interface LlmEvent {
 class LlmException(message: String, val status: Int = 0, val body: String = "") : Exception(message) {
     /** True when the server most likely rejected the `tools` field itself. */
     val toolsUnsupported: Boolean
-        get() = status in 400..422 && Regex("tool|function", RegexOption.IGNORE_CASE).containsMatchIn(body)
+        get() = status in 400..422 && !contextOverflow && Regex("tool|function", RegexOption.IGNORE_CASE).containsMatchIn(body)
+
+    /** True when the conversation was longer than the model's context (LM Studio, llama.cpp, Ollama, OpenAI-style APIs). */
+    val contextOverflow: Boolean
+        get() = (status == 0 || status in 400..599) && CONTEXT.containsMatchIn((message.orEmpty() + " " + body))
+
+    companion object {
+        private val CONTEXT = Regex(
+            "context.{0,12}(length|size|window|limit|overflow)|n_ctx|maximum context|context_length_exceeded|too many tokens|prompt is too long|" +
+                "tokens to keep|exceeds? the (available )?context|longer than the (model|context)|input is too long|reduce the length",
+            RegexOption.IGNORE_CASE,
+        )
+    }
 }
 
 interface LlmClient {

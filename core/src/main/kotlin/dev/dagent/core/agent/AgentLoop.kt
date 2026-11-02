@@ -56,6 +56,9 @@ class AgentLoop(
 ) {
     private val byName = tools.associateBy { it.name }
     private var nativeTools = options.nativeTools
+    /** Shrinks by itself when the model says the chat no longer fits (see [ContextLimits]). */
+    private var budget = minOf(options.contextChars, ContextLimits.get(model) ?: Int.MAX_VALUE)
+    private var shrinks = 0
 
     fun run(system: String, history: List<Msg>, ctx: ToolContext): Flow<AgentEvent> = flow {
         val transcript = history.toMutableList()
@@ -71,7 +74,7 @@ class AgentLoop(
                 if (offerTools && !nativeTools) append("\n\n").append(TextToolProtocol.manual(tools))
                 if (lastStep) append("\n\nYou have used every step you are allowed for this request. Do not call tools. Tell the person what you finished, what is left, and how to continue.")
             }
-            val sent = Context.fit(transcript, options.contextChars)
+            val sent = Context.fit(transcript, budget)
             if (sent.trimmed) emit(AgentEvent.Notice("Older parts of this chat were shortened to fit the model's memory."))
             val request = ChatRequest(
                 model = model,
@@ -105,6 +108,19 @@ class AgentLoop(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: LlmException) {
+                if (e.contextOverflow) {
+                    // Like Muse does: instead of failing, fit the chat into the model's memory and go on.
+                    val used = request.messages.sumOf(Context::size)
+                    if (shrinks >= 3 || used < 2_000) throw LlmException(
+                        "The model's context is too small even for a short chat with D-Agent's instructions. In LM Studio, load the model with a bigger Context Length (16384 or more).",
+                        e.status, e.body,
+                    )
+                    shrinks++
+                    budget = (minOf(budget, used) * 0.55).toInt().coerceAtLeast(1_500)
+                    ContextLimits.put(model, budget)
+                    emit(AgentEvent.Notice("The chat got longer than the model's memory, so older parts were shortened. Trying again..."))
+                    return null
+                }
                 if (nativeTools && offerTools && e.toolsUnsupported) {
                     nativeTools = false
                     emit(AgentEvent.Notice("This model does not take tools natively, so D-Agent is describing them in the prompt instead."))
@@ -207,6 +223,14 @@ class AgentLoop(
 }
 
 /** Keeps the conversation inside a size budget without breaking tool call / result pairs. */
+/** What D-Agent learned about each model's real context size this session, in characters of chat. */
+object ContextLimits {
+    private val known = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    fun get(model: String): Int? = known[model]
+    fun put(model: String, chars: Int) { known[model] = chars }
+    fun clear() = known.clear()
+}
+
 object Context {
     data class Fitted(val messages: List<Msg>, val trimmed: Boolean)
 

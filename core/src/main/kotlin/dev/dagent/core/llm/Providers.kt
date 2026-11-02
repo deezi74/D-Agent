@@ -90,6 +90,9 @@ object Providers {
 
     fun preset(id: String): ProviderPreset? = presets.firstOrNull { it.id == id }
 
+    /** A server on the home network or Tailscale (LM Studio, Ollama), usually with a small context. */
+    fun isLan(baseUrl: String) = LAN.containsMatchIn(baseUrl)
+
     fun client(
         http: OkHttpClient,
         kind: ApiKind,

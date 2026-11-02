@@ -9,7 +9,7 @@ import dev.dagent.core.agent.title
 import dev.dagent.core.places.GeoPoint
 import dev.dagent.core.places.PlacesClient
 
-private const val NO_LOCATION = "Location is off or not allowed. Ask the person to allow location for D-Agent, or to name a place."
+private const val NO_LOCATION = "Location is off or not allowed and no home address is saved. Ask the person where they are (never guess a city), and suggest Settings > Permissions > Location, or adding their address in Settings > Connectors > My details."
 
 /** Finds nearby businesses with distance, drive time and open/closed status (OpenStreetMap, or Google with a key). */
 class PlacesTool(

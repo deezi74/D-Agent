@@ -59,6 +59,7 @@ object TextToolProtocol {
     data class Parsed(val text: String, val calls: List<ToolCall>)
 
     fun parse(text: String): Parsed {
+        if (PythonicCalls.has(text)) PythonicCalls.parse(text).let { if (it.calls.isNotEmpty()) return it }
         val calls = mutableListOf<ToolCall>()
         val remaining = StringBuilder()
         var i = 0

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -37,6 +38,7 @@ fun SettingsHost(g: Graph, page: String, open: (String) -> Unit, back: () -> Uni
         "activity" -> ActivityPage(g, back)
         "vault" -> VaultPage(g, back)
         "about" -> AboutPage(back)
+        "permissions" -> PermissionsPage(g, back)
         else -> Home(g, open, back)
     }
 }
@@ -58,6 +60,7 @@ private fun Home(g: Graph, open: (String) -> Unit, back: () -> Unit) {
             is LinuxComputer.State.Failed -> "Install failed"
             LinuxComputer.State.NotInstalled -> "Not installed"
         }) { open("linux") }
+        NavRow(Icons.Default.Lock, "Permissions", "Location, contacts, texts, calls, calendar, mic, camera") { open("permissions") }
         NavRow(Icons.Default.Shield, "Guard and activity", "Rules, second look, secret vault, activity log") { open("guard") }
         NavRow(Icons.Default.Memory, "Memory", "What ${prefs.persona.name} knows about you") { open("memory") }
         NavRow(Icons.Default.Psychology, "Skills", "Know-how the agent reads before tasks") { open("skills") }

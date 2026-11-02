@@ -74,6 +74,7 @@ object PromptBuilder {
         append("- Today: ").append(situation.now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US)))
         append(" (").append(situation.now.zone.id).append(")\n")
         if (situation.place.isNotBlank()) append("- Approximate location: ").append(situation.place).append('\n')
+        else append("- Location: unknown. For weather, places or anything local, leave the place out so the phone looks it up; if that fails, ask where they are. Never assume a city. When they say where they live, save it with remember and use it.\n")
         if (situation.device.isNotBlank()) append("- Phone: ").append(situation.device).append('\n')
         append("When the person asks the time, the phone's clock is attached to their message; never guess it. Do not recite these facts unprompted.\n")
 
