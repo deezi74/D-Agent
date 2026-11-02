@@ -710,7 +710,7 @@ def show_code(cfg: dict) -> None:
         for a in local_addresses() or ["<this PC's IP>"]:
             print(f"  Address:       http://{a}:{port}")
     print()
-    print("  In D-Agent: Settings > Connectors > Your PC. Enter the address and the pairing code.")
+    print("  In D-Agent: Settings > Connectors > Always-on computer. Enter the address and the pairing code.")
     hint = "FreeLLMAPI, or tap Use the app's AI in D-Agent" if IS_TERMUX else "LM Studio: Developer tab > Start server"
     print(f"  Model server:  {cfg['llm']['base_url']}  ({hint})")
     print()
