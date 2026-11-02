@@ -440,6 +440,7 @@ class AgentRunner(private val g: Graph) {
             PlanTool(plan),
             ShellTool(g.linux),
             ShellJobTool(g.linux),
+            dev.dagent.core.tools.ReverseTool(g.linux),
             FileReadTool(ws) { vision },
             FileWriteTool(ws),
             FileEditTool(ws),

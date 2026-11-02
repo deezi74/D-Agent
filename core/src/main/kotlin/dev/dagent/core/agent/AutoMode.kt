@@ -10,7 +10,7 @@ import dev.dagent.core.llm.Role
  */
 object AutoMode {
     /** Tools only Agent mode has; using one recently keeps follow-ups in Agent. */
-    val AGENT_ONLY = setOf("shell", "shell_job", "file_read", "file_write", "file_edit", "file_list", "browser", "phone", "schedule", "skill", "plan", "forget")
+    val AGENT_ONLY = setOf("shell", "shell_job", "file_read", "file_write", "file_edit", "file_list", "browser", "phone", "schedule", "skill", "plan", "forget", "reverse")
 
     private val DO = Regex(
         "\\b(" +
@@ -21,7 +21,7 @@ object AutoMode {
             // files and computers
             "file|files|folder|pdf|docx?|spreadsheet|csv|zip|upload|download|save (it|this|that)|workspace|" +
             "install|run|execute|command|terminal|termux|linux|shell|script|code|program|compile|debug|fix (the|my|this)|deploy|server|" +
-            "pc|computer|laptop|github|repo|apk|app\\b|build|develop|" +
+            "pc|computer|laptop|github|repo|apk|app\\b|build|develop|decompile|disassemble|reverse engineer|binary|firmware|crackme|" +
             // multi-step work
             "research|compare|investigate|analy[sz]e|summari[sz]e (this|these|the) (file|doc|pdf|page|site)|plan (my|a|the)|organi[sz]e|" +
             "schedule|every (day|morning|night|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|automat|" +
