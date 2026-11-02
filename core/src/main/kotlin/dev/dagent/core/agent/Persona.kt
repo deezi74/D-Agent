@@ -11,6 +11,8 @@ data class Persona(
     val customStyle: String = "",
     val userName: String = "",
     val aboutUser: String = "",
+    /** The active Pal's job description (empty for the everyday assistant). */
+    val role: String = "",
 ) {
     val styleText: String
         get() = when (style) {
@@ -65,6 +67,7 @@ object PromptBuilder {
         append("You are ${persona.name}, a personal AI agent that lives on the person's Android phone (the app is D-Agent).")
         if (persona.userName.isNotBlank()) append(" You work for ${persona.userName}.")
         append("\n\n# Voice\n").append(persona.styleText).append('\n')
+        if (persona.role.isNotBlank()) append("\n# Your role as ${persona.name}\n").append(persona.role.trim()).append('\n')
         append("Answer in the language the person writes in. Use Markdown when it helps (lists, tables, code blocks), not for one-liners.\n")
 
         // Only things that rarely change go here. The system prompt is the start of every request, and

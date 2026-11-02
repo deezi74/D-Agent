@@ -39,7 +39,10 @@ fun SettingsHost(g: Graph, page: String, open: (String) -> Unit, back: () -> Uni
         "vault" -> VaultPage(g, back)
         "about" -> AboutPage(back)
         "permissions" -> PermissionsPage(g, back)
-        else -> Home(g, open, back)
+        "pals" -> dev.dagent.ui.pals.PalsPage(g, open, back)
+        "hub" -> dev.dagent.ui.pals.HubPage(g, back)
+        "generation" -> GenerationPage(g, back)
+        else -> if (page.startsWith("pal-edit:")) dev.dagent.ui.pals.PalEditor(g, page.removePrefix("pal-edit:"), back) else Home(g, open, back)
     }
 }
 
@@ -50,10 +53,12 @@ private fun Home(g: Graph, open: (String) -> Unit, back: () -> Unit) {
     val provider = g.settings.provider(prefs.providerId)
     Page("Settings", back) {
         NavRow(Icons.Default.Face, "${prefs.persona.name}: look and personality", "Name, character, picture, colors, about you") { open("persona") }
+        NavRow(Icons.Default.AutoAwesome, "Pals and D's Hub", g.activePal()?.let { "${it.emoji} ${it.name} is in charge" } ?: "Ready-made companions: coder, maker, security, business...") { open("pals") }
         NavRow(Icons.Default.Cloud, "AI providers", "${provider.preset.name} · ${provider.model}") { open("providers") }
         NavRow(Icons.Default.RecordVoiceOver, "Voice", if (prefs.voiceProvider == "phone") "Phone voice · get a free on-phone voice" else "Voice · " + dev.dagent.ui.voiceLabel(g, prefs)) { open("voice") }
         NavRow(Icons.Default.Hub, "Connectors", "Your PC, email, GitHub, Telegram, Termux, calls") { open("connectors") }
         NavRow(Icons.Default.PhoneAndroid, "On-phone models", "Offline AI with GGUF models") { open("local") }
+        NavRow(Icons.Default.Tune, "Generation settings", "Creativity, top K/P, min P, XTC, penalties, mirostat, seed, memory") { open("generation") }
         NavRow(Icons.Default.Terminal, "Linux computer", when (linux) {
             is LinuxComputer.State.Ready -> "Installed"
             is LinuxComputer.State.Installing -> "Installing..."

@@ -59,6 +59,12 @@ class MainActivity : ComponentActivity() {
         super.onPause()
     }
 
+    override fun onStop() {
+        super.onStop()
+        // Optional: give the on-phone model's memory back when the app is in the background.
+        if (graph.settings.current.localUnloadInBackground && !graph.runner.state.value.running && !isChangingConfigurations) graph.local.stop()
+    }
+
     private fun handleShare(intent: Intent?) {
         if (intent?.action != Intent.ACTION_SEND) return
         val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()

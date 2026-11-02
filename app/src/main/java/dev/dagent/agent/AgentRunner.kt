@@ -196,9 +196,25 @@ class AgentRunner(private val g: Graph) {
         send(text)
     }
 
+    /** The everyday persona, or the active Pal's name, role and style. */
+    private fun personaFor(pal: dev.dagent.core.pals.Pal?): dev.dagent.core.agent.Persona {
+        val base = g.settings.current.persona
+        if (pal == null) return base
+        return base.copy(name = pal.name, role = pal.instructions, style = pal.style.ifBlank { base.style })
+    }
+
+    /** A Pal can ask for its own provider and model; ignored if that provider isn't set up. */
+    private fun palProvider(pal: dev.dagent.core.pals.Pal?): dev.dagent.data.ProviderConfig? {
+        val m = pal?.model ?: return null
+        if (m.provider.isBlank()) return null
+        val c = g.settings.provider(m.provider).let { if (m.model.isNotBlank()) it.copy(model = m.model) else it }
+        return c.takeIf { it.ready && dev.dagent.core.llm.Providers.preset(m.provider) != null }
+    }
+
     private suspend fun runLoop() {
         val prefs = g.settings.current
-        val provider = g.settings.provider()
+        val pal = g.activePal()
+        val provider = palProvider(pal) ?: g.settings.provider()
         try {
             if (!provider.ready) {
                 throw IllegalStateException(
@@ -208,10 +224,12 @@ class AgentRunner(private val g: Graph) {
             }
             val isLocal = provider.id == Providers.LOCAL_ID
             if (isLocal) {
-                val file = g.local.installed().firstOrNull { it.name == prefs.localModelFile } ?: g.local.installed().firstOrNull()
+                val wanted = pal?.model?.local.orEmpty()
+                val file = (if (wanted.isNotBlank()) g.local.installed().firstOrNull { it.name == wanted || it.name.contains(wanted, ignoreCase = true) } else null)
+                    ?: g.local.installed().firstOrNull { it.name == prefs.localModelFile } ?: g.local.installed().firstOrNull()
                     ?: throw IllegalStateException("No on-phone model yet. Download one in Settings > On-phone models.")
                 _state.update { it.copy(notice = "Loading ${file.nameWithoutExtension} on the phone...") }
-                g.local.ensureRunning(file, prefs.localContext, prefs.localThreads)
+                g.local.ensureRunning(file, prefs.localContext, prefs.localThreads, g.loadOpts())
                 _state.update { it.copy(notice = "") }
             }
             if (!isLocal) ensureServerUp(provider.baseUrl)
@@ -261,13 +279,14 @@ class AgentRunner(private val g: Graph) {
                     agentMode = agentMode,
                     modelName = provider.model,
                 )
-                val system = PromptBuilder.build(prefs.persona, situation, g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) + vaultNote(tools)
+                val system = PromptBuilder.build(personaFor(pal), situation, g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet()) + vaultNote(tools)
                 val options = AgentOptions(
                     maxSteps = if (agentMode) 40 else 6,
                     think = prefs.think,
                     // A home PC usually runs a 8-16K context; start small enough and shrink further if it says so.
                     contextChars = if (isLocal) (prefs.localContext * 3) else if (Providers.isLan(provider.baseUrl)) 36_000 else 240_000,
                     maxTokens = if (isLocal) 2048 else 8192,
+                    sampling = prefs.sampling.with(pal?.sampling).takeUnless { it.isEmpty },
                 )
                 val loop = AgentLoop(client, provider.model, tools, options, guard(client, provider.model, isLocal, background = false))
                 // The exact time rides on the latest message only when it's needed (see PromptBuilder).
@@ -460,7 +479,7 @@ class AgentRunner(private val g: Graph) {
         val prefs = g.settings.current
         if (provider.id == Providers.LOCAL_ID) {
             val file = g.local.installed().firstOrNull { it.name == prefs.localModelFile } ?: g.local.installed().first()
-            g.local.ensureRunning(file, prefs.localContext, prefs.localThreads)
+            g.local.ensureRunning(file, prefs.localContext, prefs.localThreads, g.loadOpts())
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
         val tools = tools(agentMode = true, vision = false).filterNot { it.name == "plan" }
@@ -486,7 +505,7 @@ class AgentRunner(private val g: Graph) {
         val prefs = g.settings.current
         if (provider.id == Providers.LOCAL_ID) {
             val file = g.local.installed().firstOrNull { it.name == prefs.localModelFile } ?: g.local.installed().first()
-            g.local.ensureRunning(file, prefs.localContext, prefs.localThreads)
+            g.local.ensureRunning(file, prefs.localContext, prefs.localThreads, g.loadOpts())
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
         val tools = listOf<Tool>(WebSearchTool(g.search), WebFetchTool(g.http), RecallTool(g.memory))
@@ -511,7 +530,7 @@ class AgentRunner(private val g: Graph) {
         val prefs = g.settings.current
         if (provider.id == Providers.LOCAL_ID) {
             val file = g.local.installed().firstOrNull { it.name == prefs.localModelFile } ?: g.local.installed().first()
-            g.local.ensureRunning(file, prefs.localContext, prefs.localThreads)
+            g.local.ensureRunning(file, prefs.localContext, prefs.localThreads, g.loadOpts())
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
         val tools = tools(agentMode = prefs.agentMode || prefs.autoMode, vision = images.isNotEmpty()).filterNot { it.name == "plan" }

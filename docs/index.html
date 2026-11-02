@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D-Agent · D's Hub</title>
+<meta name="description" content="D-Agent is a free AI agent that lives on your Android phone. D's Hub is where its Pals live.">
+<style>
+  :root {
+    --bg: #0b0b0d; --surface: #15161a; --surface2: #1e2026; --line: #2a2d35;
+    --text: #f2f2f4; --muted: #9ba0aa; --accent: #ff6b35; --accent2: #ffc447;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 18px 0; display: flex; align-items: center; gap: 12px; }
+  .logo { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: grid; place-items: center; font-weight: 900; color: #1a0e08; font-size: 20px; }
+  header nav { margin-left: auto; display: flex; gap: 18px; font-size: 15px; }
+  header nav a { color: var(--muted); text-decoration: none; }
+  header nav a:hover { color: var(--text); }
+  .hero { padding: 48px 0 32px; display: grid; gap: 18px; }
+  .hero h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.05; margin: 0; letter-spacing: -0.02em; }
+  .hero h1 span { color: var(--accent); }
+  .hero p { color: var(--muted); font-size: 18px; max-width: 640px; margin: 0; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-block; padding: 13px 22px; border-radius: 999px; font-weight: 700; text-decoration: none; }
+  .btn.primary { background: var(--accent); color: #1a0e08; }
+  .btn.ghost { border: 1px solid var(--line); color: var(--text); }
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; padding: 16px 0 40px; }
+  .feature { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  .feature b { display: block; margin-bottom: 4px; }
+  .feature span { color: var(--muted); font-size: 14px; }
+  h2 { font-size: 28px; margin: 8px 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .tools input { flex: 1 1 240px; background: var(--surface); border: 1px solid var(--line); color: var(--text); border-radius: 12px; padding: 11px 14px; font-size: 15px; }
+  .tag { background: var(--surface2); border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 8px 14px; font-size: 14px; cursor: pointer; }
+  .tag.on { background: var(--accent); color: #1a0e08; border-color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; padding-bottom: 48px; }
+  .pal { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .pal .top { display: flex; gap: 12px; align-items: center; }
+  .face { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; flex: none; }
+  .pal h3 { margin: 0; font-size: 18px; }
+  .pal .by { color: var(--muted); font-size: 13px; }
+  .pal p { margin: 0; font-size: 14px; }
+  .starters { display: flex; flex-direction: column; gap: 6px; }
+  .starters div { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font-size: 13px; color: var(--muted); }
+  .pal .row { display: flex; gap: 8px; margin-top: auto; }
+  .small { padding: 9px 14px; font-size: 14px; border-radius: 999px; border: 0; cursor: pointer; font-weight: 700; }
+  .small.primary { background: var(--accent); color: #1a0e08; }
+  .small.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .note { background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 14px; color: var(--muted); font-size: 14px; margin-bottom: 18px; }
+  footer { border-top: 1px solid var(--line); padding: 20px 0 40px; color: var(--muted); font-size: 13px; }
+  @media (max-width: 560px) { header nav { gap: 12px; font-size: 14px; } .hero { padding-top: 28px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">D</div>
+    <strong>D-Agent</strong>
+    <nav><a href="#hub">D's Hub</a><a href="#get">Get the app</a></nav>
+  </header>
+
+  <section class="hero" id="get">
+    <h1>Your AI pal that <span>lives on your phone</span>.</h1>
+    <p>D-Agent chats, talks, sees through your camera, codes, browses and runs tasks for you. It works with free AI, your own PC, or fully offline on the phone. No account needed.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/deezi74/D-Agent/releases/latest">Download for Android (free)</a>
+      <a class="btn ghost" href="#hub">Browse Pals</a>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="feature"><b>Talks like a person</b><span>Natural voices that run on the phone, offline. Talk over it to interrupt.</span></div>
+    <div class="feature"><b>Does the work</b><span>Agent mode searches, writes code, builds sites and apps, and uses your phone with your OK.</span></div>
+    <div class="feature"><b>Private by choice</b><span>Run models on your phone or home PC. Nothing leaves unless you pick a cloud service.</span></div>
+    <div class="feature"><b>Pals for every job</b><span>Coder, maker, security coach, business coach, tutor and more. Make and share your own.</span></div>
+  </section>
+
+  <section id="hub">
+    <h2>D's Hub</h2>
+    <p class="sub">Pals made for D-Agent. Every Pal is free. In the app: Settings › Pals and D's Hub.</p>
+    <div class="note">To add a Pal: open D-Agent › Pals and D's Hub › Browse D's Hub and tap <b>Get free</b>. Or download the Pal file here and open it with D-Agent (Pals › Import). Sign-in and uploading your own Pals are coming later.</div>
+    <div class="tools">
+      <input id="q" type="search" placeholder="Search Pals" aria-label="Search Pals">
+    </div>
+    <div class="tools" id="tags"></div>
+    <div class="grid" id="grid"><div class="note">Loading Pals…</div></div>
+  </section>
+
+  <footer>
+    D-Agent is made by deezi74. Open-source parts are listed in <a href="https://github.com/deezi74/D-Agent/blob/claude/project-thread-7jgi6v/THIRD_PARTY_NOTICES.md">third-party notices</a>.
+  </footer>
+</div>
+<script>
+(function () {
+  var all = [], tag = "";
+  var grid = document.getElementById("grid"), q = document.getElementById("q"), tags = document.getElementById("tags");
+  function hex(n) {
+    var s = (Number(n) >>> 0).toString(16).padStart(8, "0");
+    return "#" + s.slice(2);
+  }
+  function el(t, cls, text) { var e = document.createElement(t); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function file(p) {
+    var copy = Object.assign({}, p); delete copy.builtin;
+    var blob = new Blob([JSON.stringify(copy, null, 2)], { type: "application/json" });
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = p.id + ".dpal"; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  }
+  function render() {
+    var term = q.value.trim().toLowerCase();
+    var shown = all.filter(function (p) {
+      var hay = [p.name, p.tagline, (p.tags || []).join(" ")].join(" ").toLowerCase();
+      return (!term || hay.indexOf(term) >= 0) && (!tag || (p.tags || []).indexOf(tag) >= 0);
+    });
+    grid.innerHTML = "";
+    if (!shown.length) { grid.appendChild(el("div", "note", "No Pals match.")); return; }
+    shown.forEach(function (p) {
+      var card = el("div", "pal");
+      var top = el("div", "top");
+      var face = el("div", "face", p.emoji || "✨"); face.style.background = hex(p.color || 0xFF2A2F3A);
+      var names = el("div"); names.appendChild(el("h3", "", p.name)); names.appendChild(el("div", "by", "by " + (p.author || "D-Agent") + " · free"));
+      top.appendChild(face); top.appendChild(names); card.appendChild(top);
+      card.appendChild(el("p", "", p.tagline || ""));
+      if (p.starters && p.starters.length) {
+        var st = el("div", "starters");
+        p.starters.slice(0, 3).forEach(function (s) { st.appendChild(el("div", "", "“" + s + "”")); });
+        card.appendChild(st);
+      }
+      var row = el("div", "row");
+      var get = el("button", "small primary", "Download Pal"); get.onclick = function () { file(p); };
+      row.appendChild(get);
+      card.appendChild(row);
+      grid.appendChild(card);
+    });
+  }
+  function renderTags() {
+    var seen = {};
+    all.forEach(function (p) { (p.tags || []).forEach(function (t) { seen[t] = (seen[t] || 0) + 1; }); });
+    tags.innerHTML = "";
+    [""].concat(Object.keys(seen).sort()).forEach(function (t) {
+      var b = el("button", "tag" + (t === tag ? " on" : ""), t ? "#" + t : "All");
+      b.onclick = function () { tag = t; renderTags(); render(); };
+      tags.appendChild(b);
+    });
+  }
+  q.addEventListener("input", render);
+  fetch("hub/pals.json", { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (h) {
+    all = (h.pals || []).slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+    renderTags(); render();
+  }).catch(function () {
+    grid.innerHTML = ""; grid.appendChild(el("div", "note", "Couldn't load the Pal list. Try again in a minute."));
+  });
+})();
+</script>
+</body>
+</html>

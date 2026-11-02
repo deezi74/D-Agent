@@ -45,6 +45,45 @@ data class Msg(
 /** A tool the model may call. [parameters] is a JSON Schema object. */
 data class ToolSpec(val name: String, val description: String, val parameters: JsonObject)
 
+/**
+ * How the model picks its words. Every field is optional; only the ones set are sent.
+ * Servers on this phone or your own network (llama.cpp, LM Studio) take all of them;
+ * cloud services get only the standard ones (temperature, top P, penalties, seed, length).
+ */
+@Serializable
+data class Sampling(
+    val temperature: Double? = null,
+    val topP: Double? = null,
+    val topK: Int? = null,
+    val minP: Double? = null,
+    val typicalP: Double? = null,
+    val xtcProbability: Double? = null,
+    val xtcThreshold: Double? = null,
+    val repeatPenalty: Double? = null,
+    val repeatLastN: Int? = null,
+    val presencePenalty: Double? = null,
+    val frequencyPenalty: Double? = null,
+    /** 0 off, 1 or 2. */
+    val mirostat: Int? = null,
+    val mirostatTau: Double? = null,
+    val mirostatEta: Double? = null,
+    /** -1 or null for random. */
+    val seed: Long? = null,
+    /** Longest reply in tokens; null keeps the app default. */
+    val maxTokens: Int? = null,
+) {
+    /** [over] wins wherever it sets a value. */
+    fun with(over: Sampling?): Sampling = if (over == null) this else Sampling(
+        over.temperature ?: temperature, over.topP ?: topP, over.topK ?: topK, over.minP ?: minP, over.typicalP ?: typicalP,
+        over.xtcProbability ?: xtcProbability, over.xtcThreshold ?: xtcThreshold, over.repeatPenalty ?: repeatPenalty,
+        over.repeatLastN ?: repeatLastN, over.presencePenalty ?: presencePenalty, over.frequencyPenalty ?: frequencyPenalty,
+        over.mirostat ?: mirostat, over.mirostatTau ?: mirostatTau, over.mirostatEta ?: mirostatEta, over.seed ?: seed,
+        over.maxTokens ?: maxTokens,
+    )
+
+    val isEmpty get() = this == Sampling()
+}
+
 data class ChatRequest(
     val model: String,
     val system: String,
@@ -54,6 +93,7 @@ data class ChatRequest(
     val maxTokens: Int = 8192,
     /** Ask models that support it to think before answering. */
     val think: Boolean = false,
+    val sampling: Sampling? = null,
 )
 
 /** What a streaming call produces, in order. */

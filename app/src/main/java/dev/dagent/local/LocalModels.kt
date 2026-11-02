@@ -103,6 +103,7 @@ class LocalModels(private val context: Context) {
 
     private var process: Process? = null
     private var runningFile: String = ""
+    private var runningKey: String = ""
     private val log = File(context.cacheDir, "llama-server.log")
     private val http = OkHttpClient.Builder().connectTimeout(2, TimeUnit.SECONDS).readTimeout(3, TimeUnit.SECONDS).build()
 
@@ -215,10 +216,27 @@ class LocalModels(private val context: Context) {
     }
 
     /** Starts the server with [file] unless it already runs it. Returns when it answers. */
-    suspend fun ensureRunning(file: File, contextSize: Int, threads: Int) = withContext(Dispatchers.IO) {
+    /** How the on-phone model is loaded (Settings > On-phone models > Loading). */
+    data class LoadOpts(
+        /** Keep the whole model in RAM so Android can't swap or compress it. */
+        val mlock: Boolean = false,
+        /** Map the file instead of reading it all in (faster start, less RAM up front). */
+        val mmap: Boolean = true,
+        /** Store the chat memory at 8 bits: about half the RAM for long chats, tiny quality cost. */
+        val kvQuant: Boolean = false,
+    ) {
+        fun args(): List<String> = buildList {
+            if (mlock) add("--mlock")
+            if (!mmap) add("--no-mmap")
+            if (kvQuant) addAll(listOf("-ctk", "q8_0", "-ctv", "q8_0"))
+        }
+    }
+
+    suspend fun ensureRunning(file: File, contextSize: Int, threads: Int, opts: LoadOpts = LoadOpts()) = withContext(Dispatchers.IO) {
         if (!engineBundled) throw IOException("This build has no on-phone engine (arm64 phones only).")
         if (!file.isFile) throw IOException("Model file is missing: ${file.name}. Pick one in Settings > On-phone models.")
-        if (process?.isAlive == true && runningFile == file.name && healthy()) return@withContext
+        val key = file.name + "|" + contextSize + "|" + threads + "|" + opts
+        if (process?.isAlive == true && runningFile == file.name && runningKey == key && healthy()) return@withContext
         stop()
         _engine.value = Engine.Starting(file.name)
         val cores = Runtime.getRuntime().availableProcessors()
@@ -233,10 +251,12 @@ class LocalModels(private val context: Context) {
             "--jinja",
             "--no-webui",
             "-np", "1",
+            *opts.args().toTypedArray(),
         ).redirectErrorStream(true).redirectOutput(log)
         pb.environment()["LD_LIBRARY_PATH"] = context.applicationInfo.nativeLibraryDir
         process = pb.start()
         runningFile = file.name
+        runningKey = key
         val deadline = System.currentTimeMillis() + 180_000
         while (System.currentTimeMillis() < deadline) {
             if (process?.isAlive != true) {

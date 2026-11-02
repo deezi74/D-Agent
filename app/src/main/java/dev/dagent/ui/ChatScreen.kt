@@ -40,6 +40,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Explore
@@ -175,7 +177,8 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
                 ChatDrawer(g, state.session.id,
                     onOpen = { g.runner.open(it); scope.launch { drawer.close() } },
                     onNew = { g.runner.newChat(); scope.launch { drawer.close() } },
-                    onSettings = { scope.launch { drawer.close() }; openSettings("home") })
+                    onSettings = { scope.launch { drawer.close() }; openSettings("home") },
+                    onPals = { scope.launch { drawer.close() }; openSettings("pals") })
             }
         },
     ) {
@@ -185,7 +188,8 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
                 IconButton({ scope.launch { drawer.open() } }) { Icon(Icons.Default.Menu, "Chats", tint = p.text) }
                 AgentAvatar(prefs.persona.name, prefs.avatarPath, if (look != null) 44.dp else 38.dp, busy = state.running, modifier = Modifier.clickable { openSettings("persona") }, look = look, mood = mood)
                 Column(Modifier.weight(1f).padding(start = 10.dp).clickable { showModels = true }) {
-                    Text(prefs.persona.name, color = p.text, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    val pal = remember(prefs.activePal) { g.activePal() }
+                    Text(pal?.let { "${it.emoji} ${it.name}" } ?: prefs.persona.name, color = p.text, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
                     Text(
                         if (state.running) (state.live.values.lastOrNull { it.running }?.title ?: "Thinking...") + (if (waited >= 5) " · ${waited}s" else "") else "${provider.preset.name} · ${provider.model}",
                         color = if (state.running) p.accent else p.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -201,7 +205,9 @@ fun ChatScreen(g: Graph, shared: MutableState<Pair<String, Uri?>?>, openSettings
 
             Box(Modifier.weight(1f)) {
                 if (state.session.messages.isEmpty() && !state.running) {
-                    EmptyChat(prefs.persona.name, prefs.avatarPath, prefs.persona.userName, prefs.agentMode || prefs.autoMode, look) { input = it }
+                    val pal = remember(prefs.activePal) { g.activePal() }
+                    if (pal != null) PalEmptyChat(g, pal, prefs.persona.name, openPals = { openSettings("pals") }) { input = it }
+                    else EmptyChat(prefs.persona.name, prefs.avatarPath, prefs.persona.userName, prefs.agentMode || prefs.autoMode, look, g, openPals = { openSettings("pals") }) { input = it }
                 } else {
                     Transcript(g, state)
                 }
@@ -254,7 +260,7 @@ private fun ModeSwitch(mode: String, working: Boolean, usingAgent: Boolean, onCh
 }
 
 @Composable
-private fun EmptyChat(name: String, avatar: String, user: String, agent: Boolean, look: dev.dagent.character.CharacterLook?, pick: (String) -> Unit) {
+private fun EmptyChat(name: String, avatar: String, user: String, agent: Boolean, look: dev.dagent.character.CharacterLook?, g: Graph, openPals: () -> Unit, pick: (String) -> Unit) {
     val p = LocalPalette.current
     val ideas = if (agent) listOf(
         "What's the biggest news today? Give me the short version with sources.",
@@ -281,7 +287,9 @@ private fun EmptyChat(name: String, avatar: String, user: String, agent: Boolean
             if (agent) "Give me a job. I'll search, code, browse and use your phone to get it done." else "Ask me anything. Switch to Agent when you want me to do the work.",
             color = p.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp, bottom = 18.dp),
         )
-        ideas.forEach { idea ->
+        dev.dagent.ui.pals.PalStrip(g, openPals)
+        Spacer(Modifier.height(10.dp))
+        ideas.take(4).forEach { idea ->
             Text(
                 idea, color = p.text, fontSize = 14.sp,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(14.dp))
@@ -793,7 +801,7 @@ private fun HandOverDialog(g: Graph) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChatDrawer(g: Graph, current: String, onOpen: (String) -> Unit, onNew: () -> Unit, onSettings: () -> Unit) {
+private fun ChatDrawer(g: Graph, current: String, onOpen: (String) -> Unit, onNew: () -> Unit, onSettings: () -> Unit, onPals: () -> Unit) {
     val p = LocalPalette.current
     val index by g.chats.index.collectAsState()
     var query by remember { mutableStateOf("") }
@@ -818,6 +826,10 @@ private fun ChatDrawer(g: Graph, current: String, onOpen: (String) -> Unit, onNe
             }
         }
         HorizontalDivider(color = p.line)
+        Row(Modifier.fillMaxWidth().clickable(onClick = onPals).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.AutoAwesome, null, tint = p.accent)
+            Text("  Pals and D's Hub", color = p.text)
+        }
         Row(Modifier.fillMaxWidth().clickable(onClick = onSettings).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Settings, null, tint = p.text)
             Text("  Settings", color = p.text)
@@ -860,4 +872,34 @@ private fun ModelSwitcher(g: Graph, close: (openProviders: Boolean) -> Unit) {
         },
         confirmButton = { TextButton({ close(true) }) { Text("Manage providers") } },
     )
+}
+
+/** The empty chat when a Pal is in charge: its face, job and starter questions. */
+@Composable
+private fun PalEmptyChat(g: Graph, pal: dev.dagent.core.pals.Pal, everyday: String, openPals: () -> Unit, pick: (String) -> Unit) {
+    val p = LocalPalette.current
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(Modifier.size(96.dp).clip(CircleShape).background(Color(pal.color)), contentAlignment = Alignment.Center) {
+            Text(pal.emoji, fontSize = 44.sp)
+        }
+        Spacer(Modifier.height(14.dp))
+        Text("I'm ${pal.name}.", color = p.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(pal.tagline, color = p.muted, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 6.dp, bottom = 18.dp))
+        pal.starters.forEach { idea ->
+            Text(
+                idea, color = p.text, fontSize = 14.sp,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(14.dp))
+                    .background(p.surface).border(1.dp, p.line, RoundedCornerShape(14.dp)).clickable { pick(idea) }.padding(12.dp),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton({ g.settings.update { it.copy(activePal = "") } }) { Text("Back to $everyday") }
+            TextButton(openPals) { Text("Other Pals") }
+        }
+    }
 }

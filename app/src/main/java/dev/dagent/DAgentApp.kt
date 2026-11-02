@@ -76,7 +76,9 @@ class Graph(val context: Context) {
     val speaker by lazy {
         Speaker(context, cloudVoice, neuralVoice) {
             val s = settings.current
-            if (neuralVoice.handles(s.voiceProvider)) Speaker.Pick(s.voiceProvider, s.voiceName.toIntOrNull() ?: 0, s.voiceSpeed) else null
+            val pal = activePal()
+            if (pal != null && pal.voicePack.isNotBlank() && neuralVoice.handles(pal.voicePack)) Speaker.Pick(pal.voicePack, pal.voiceId ?: 0, s.voiceSpeed)
+            else if (neuralVoice.handles(s.voiceProvider)) Speaker.Pick(s.voiceProvider, s.voiceName.toIntOrNull() ?: 0, s.voiceSpeed) else null
         }
     }
     val phone = PhoneActions(context, interactions, { settings.current.confirmRisky }, { speaker.say(it) }, { settings.current.defaultSim })
@@ -106,6 +108,11 @@ class Graph(val context: Context) {
     val videos = dev.dagent.media.VideoMaker(settings)
     val content = dev.dagent.content.ContentStore(context.filesDir)
     val feedWriter = dev.dagent.content.FeedWriter(this)
+    val pals = dev.dagent.core.pals.PalStore(File(context.filesDir, "pals"))
+    val hub = dev.dagent.pals.DsHub(http, File(context.cacheDir, "hub.json"))
+    /** The Pal in charge, or null for the everyday assistant. */
+    fun activePal(): dev.dagent.core.pals.Pal? = settings.current.activePal.takeIf { it.isNotBlank() }?.let { pals.get(it) }
+    fun loadOpts() = settings.current.let { dev.dagent.local.LocalModels.LoadOpts(it.localMlock, it.localMmap, it.localKvQuant) }
     val runner = AgentRunner(this)
     val telegram = TelegramBot(this)
 }

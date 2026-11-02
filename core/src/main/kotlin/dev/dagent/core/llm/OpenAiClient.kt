@@ -40,6 +40,8 @@ class OpenAiClient(
     private val base = baseUrl.trimEnd('/')
     /** The phone's own llama.cpp server: it can report how far it is through reading the prompt. */
     private val llamaServer = base.contains("127.0.0.1:${Providers.LOCAL_PORT}")
+    /** llama.cpp or LM Studio on this phone or the home network: takes the extra sampling knobs. */
+    private val ownServer = llamaServer || Providers.isLan(base)
 
     override fun stream(request: ChatRequest): Flow<LlmEvent> = flow {
         val body = buildBody(request).toString()
@@ -131,6 +133,27 @@ class OpenAiClient(
             if (!req.think) putJsonObject("chat_template_kwargs") { put("enable_thinking", false) }
         }
         req.temperature?.let { put("temperature", it) }
+        req.sampling?.let { sm ->
+            sm.topP?.let { put("top_p", it) }
+            sm.presencePenalty?.let { put("presence_penalty", it) }
+            sm.frequencyPenalty?.let { put("frequency_penalty", it) }
+            sm.seed?.takeIf { it >= 0 }?.let { put("seed", it) }
+            sm.maxTokens?.takeIf { it > 0 }?.let { put("max_tokens", it) }
+            if (ownServer) {
+                sm.topK?.let { put("top_k", it) }
+                sm.minP?.let { put("min_p", it) }
+                sm.typicalP?.let { put("typical_p", it) }
+                sm.xtcProbability?.let { put("xtc_probability", it) }
+                sm.xtcThreshold?.let { put("xtc_threshold", it) }
+                sm.repeatPenalty?.let { put("repeat_penalty", it) }
+                sm.repeatLastN?.let { put("repeat_last_n", it) }
+                sm.mirostat?.takeIf { it > 0 }?.let { m ->
+                    put("mirostat", m)
+                    sm.mirostatTau?.let { put("mirostat_tau", it) }
+                    sm.mirostatEta?.let { put("mirostat_eta", it) }
+                }
+            }
+        }
         if (req.think) when (reasoning) {
             ReasoningStyle.EFFORT -> put("reasoning_effort", "medium")
             ReasoningStyle.OPENROUTER -> putJsonObject("reasoning") { put("effort", "medium") }

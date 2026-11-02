@@ -50,6 +50,15 @@ data class AppPrefs(
     val talkOver: Boolean = true,
     /** Speed of the on-phone voices (0.7 to 1.4). */
     val voiceSpeed: Float = 1.0f,
+    /** The Pal in charge right now ("" for the everyday assistant). */
+    val activePal: String = "",
+    /** Word-picking settings for every chat (a Pal's own settings win over these). */
+    val sampling: dev.dagent.core.llm.Sampling = dev.dagent.core.llm.Sampling(),
+    val localMlock: Boolean = false,
+    val localMmap: Boolean = true,
+    val localKvQuant: Boolean = false,
+    /** Free the on-phone model's memory when the app goes to the background. */
+    val localUnloadInBackground: Boolean = false,
 )
 
 /** Plain preferences in one file; API keys in an encrypted one. */
@@ -100,6 +109,12 @@ class Settings(context: Context) {
         listenEngine = prefs.getString("voice.listen", "android")!!,
         talkOver = prefs.getBoolean("voice.talkover", true),
         voiceSpeed = prefs.getFloat("voice.speed", 1.0f),
+        activePal = prefs.getString("pal", "")!!,
+        sampling = runCatching { SAMPLING_JSON.decodeFromString(dev.dagent.core.llm.Sampling.serializer(), prefs.getString("gen.sampling", "{}")!!) }.getOrDefault(dev.dagent.core.llm.Sampling()),
+        localMlock = prefs.getBoolean("local.mlock", false),
+        localMmap = prefs.getBoolean("local.mmap", true),
+        localKvQuant = prefs.getBoolean("local.kvq", false),
+        localUnloadInBackground = prefs.getBoolean("local.unloadBg", false),
     )
 
     fun update(block: (AppPrefs) -> AppPrefs) {
@@ -130,6 +145,12 @@ class Settings(context: Context) {
             .putString("voice.listen", n.listenEngine)
             .putBoolean("voice.talkover", n.talkOver)
             .putFloat("voice.speed", n.voiceSpeed)
+            .putString("pal", n.activePal)
+            .putString("gen.sampling", SAMPLING_JSON.encodeToString(dev.dagent.core.llm.Sampling.serializer(), n.sampling))
+            .putBoolean("local.mlock", n.localMlock)
+            .putBoolean("local.mmap", n.localMmap)
+            .putBoolean("local.kvq", n.localKvQuant)
+            .putBoolean("local.unloadBg", n.localUnloadInBackground)
             .apply()
         _state.value = n
     }
@@ -177,3 +198,5 @@ class Settings(context: Context) {
         )
     }
 }
+
+private val SAMPLING_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; explicitNulls = false }

@@ -28,6 +28,8 @@ data class AgentOptions(
     val contextChars: Int = 240_000,
     /** How many times a tool may be called with identical arguments in one run. */
     val repeatLimit: Int = 3,
+    /** Word-picking settings from Settings or the active Pal. */
+    val sampling: dev.dagent.core.llm.Sampling? = null,
 )
 
 sealed interface AgentEvent {
@@ -81,9 +83,10 @@ class AgentLoop(
                 system = sys,
                 messages = if (nativeTools) sent.messages else TextToolProtocol.flatten(sent.messages),
                 tools = if (offerTools && nativeTools) tools.map { it.spec() } else emptyList(),
-                temperature = options.temperature,
-                maxTokens = options.maxTokens,
+                temperature = options.sampling?.temperature ?: options.temperature,
+                maxTokens = options.sampling?.maxTokens ?: options.maxTokens,
                 think = options.think,
+                sampling = options.sampling,
             )
             val reply = streamWithRetry(request, offerTools) ?: continue
             transcript += reply
