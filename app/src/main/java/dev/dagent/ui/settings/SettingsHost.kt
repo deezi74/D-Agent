@@ -55,7 +55,7 @@ private fun Home(g: Graph, open: (String) -> Unit, back: () -> Unit) {
     val provider = g.settings.provider(prefs.providerId)
     Page("Settings", back) {
         NavRow(Icons.Default.Face, "${prefs.persona.name}: look and personality", "Name, character, picture, colors, about you") { open("persona") }
-        NavRow(Icons.Default.AutoAwesome, "Pals and D's Hub", g.activePal()?.let { "${it.emoji} ${it.name} is in charge" } ?: "Ready-made companions: coder, maker, security, business...") { open("pals") }
+        NavRow(Icons.Default.AutoAwesome, "Dabs and D's Hub", g.activePal()?.let { "${it.emoji} ${it.name} is in charge" } ?: "Ready-made companions: coder, maker, security, business...") { open("pals") }
         NavRow(Icons.Default.Cloud, "AI providers", "${provider.preset.name} · ${provider.model}") { open("providers") }
         NavRow(Icons.Default.RecordVoiceOver, "Voice", if (prefs.voiceProvider == "phone") "Phone voice · get a free on-phone voice" else "Voice · " + dev.dagent.ui.voiceLabel(g, prefs)) { open("voice") }
         NavRow(Icons.Default.Hub, "Connectors", "Your PC, email, GitHub, Telegram, Termux, calls") { open("connectors") }

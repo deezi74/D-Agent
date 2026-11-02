@@ -20,7 +20,7 @@ data class PalModel(
 /**
  * A Pal: a ready-made companion with its own job, personality, starter questions and,
  * optionally, its own model, word-picking settings and voice. Shared as a small JSON file
- * (.dpal) or through D's Hub.
+ * (.dab, older .dpal files still open) or through D's Hub.
  */
 @Serializable
 data class Pal(
@@ -67,7 +67,7 @@ data class HubIndex(val updated: String = "", val pals: List<Pal> = emptyList())
 object PalFormat {
     val json = Json { ignoreUnknownKeys = true; prettyPrint = true; encodeDefaults = false; explicitNulls = false }
 
-    const val EXT = "dpal"
+    const val EXT = "dab"
     private const val MAX_TEXT = 12_000
 
     fun encode(pal: Pal): String = json.encodeToString(Pal.serializer(), pal.copy(builtin = false))
@@ -75,7 +75,7 @@ object PalFormat {
     /** Reads a shared Pal and makes it safe to keep: trims sizes, drops the built-in flag. */
     fun decode(text: String): Pal {
         val p = json.decodeFromString(Pal.serializer(), text.trim())
-        require(p.name.isNotBlank()) { "This Pal has no name." }
+        require(p.name.isNotBlank()) { "This Dab has no name." }
         return clean(p)
     }
 

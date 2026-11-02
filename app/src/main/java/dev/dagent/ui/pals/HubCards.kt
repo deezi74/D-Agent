@@ -124,12 +124,12 @@ fun HubPage(g: Graph, back: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Discover Pals", color = p.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Discover Dabs", color = p.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text("Free for everyone. Accounts and your own uploads come later.", color = p.muted, fontSize = 12.sp)
             }
             TextButton({ searching = !searching }) { Icon(Icons.Default.Search, "Search", tint = p.text) }
         }
-        if (searching) OutlinedTextField(search, { search = it }, label = { Text("Search Pals") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        if (searching) OutlinedTextField(search, { search = it }, label = { Text("Search Dabs") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             HubFilter.entries.forEach { f ->
                 val on = f == filter
@@ -156,7 +156,7 @@ fun HubPage(g: Graph, back: () -> Unit) {
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-        if (list != null && shown.isEmpty()) Muted(if (filter == HubFilter.PREMIUM) "Premium Pals are coming later. Everything here is free for now." else "No Pals match.")
+        if (list != null && shown.isEmpty()) Muted(if (filter == HubFilter.PREMIUM) "Premium Dabs are coming later. Everything here is free for now." else "No Dabs match.")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton({ reload++ }) { Text("Refresh") }
             TextButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DsHub.SITE)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }) { Text("Open the website") }

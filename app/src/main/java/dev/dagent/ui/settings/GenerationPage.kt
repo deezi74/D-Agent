@@ -36,7 +36,7 @@ fun GenerationPage(g: Graph, back: () -> Unit) {
     val s = prefs.sampling
     fun set(block: (Sampling) -> Sampling) = g.settings.update { it.copy(sampling = block(it.sampling)) }
     Page("Generation settings", back) {
-        Muted("How the model picks its words. Leave a setting on Default to use the model's own. On your phone and home PC (llama.cpp, LM Studio) every setting works; cloud services use creativity, top P, penalties, seed and length. A Pal's own settings win over these.")
+        Muted("How the model picks its words. Leave a setting on Default to use the model's own. On your phone and home PC (llama.cpp, LM Studio) every setting works; cloud services use creativity, top P, penalties, seed and length. A Dab's own settings win over these.")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton({ g.settings.update { it.copy(sampling = Sampling(temperature = 0.3, topP = 0.9, minP = 0.05)) } }) { Text("Precise") }
             OutlinedButton({ g.settings.update { it.copy(sampling = Sampling(temperature = 0.7, topP = 0.95, minP = 0.05)) } }) { Text("Balanced") }

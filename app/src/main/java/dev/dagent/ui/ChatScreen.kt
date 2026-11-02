@@ -828,7 +828,7 @@ private fun ChatDrawer(g: Graph, current: String, onOpen: (String) -> Unit, onNe
         HorizontalDivider(color = p.line)
         Row(Modifier.fillMaxWidth().clickable(onClick = onPals).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.AutoAwesome, null, tint = p.accent)
-            Text("  Pals and D's Hub", color = p.text)
+            Text("  Dabs and D's Hub", color = p.text)
         }
         Row(Modifier.fillMaxWidth().clickable(onClick = onSettings).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Settings, null, tint = p.text)
@@ -899,7 +899,7 @@ private fun PalEmptyChat(g: Graph, pal: dev.dagent.core.pals.Pal, everyday: Stri
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton({ g.settings.update { it.copy(activePal = "") } }) { Text("Back to $everyday") }
-            TextButton(openPals) { Text("Other Pals") }
+            TextButton(openPals) { Text("Other Dabs") }
         }
     }
 }

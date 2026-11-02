@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>D-Agent · D's Hub</title>
-<meta name="description" content="D-Agent is a free AI agent that lives on your Android phone. D's Hub is where its Pals live.">
+<meta name="description" content="D-Agent is a free AI agent that lives on your Android phone. D's Hub is where its Dabs live.">
 <style>
   :root {
     --bg: #0b0b0d; --surface: #15161a; --surface2: #1e2026; --line: #2a2d35;
@@ -83,7 +83,7 @@
     <p>D-Agent chats, talks, sees through your camera, codes, browses and runs tasks for you. It works with free AI, your own PC, or fully offline on the phone. No account needed.</p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/deezi74/D-Agent/releases/latest">Download for Android (free)</a>
-      <a class="btn ghost" href="#hub">Browse Pals</a>
+      <a class="btn ghost" href="#hub">Browse Dabs</a>
     </div>
   </section>
 
@@ -91,18 +91,18 @@
     <div class="feature"><b>Talks like a person</b><span>Natural voices that run on the phone, offline. Talk over it to interrupt.</span></div>
     <div class="feature"><b>Does the work</b><span>Agent mode searches, writes code, builds sites and apps, and uses your phone with your OK.</span></div>
     <div class="feature"><b>Private by choice</b><span>Run models on your phone or home PC. Nothing leaves unless you pick a cloud service.</span></div>
-    <div class="feature"><b>Pals for every job</b><span>Coder, maker, security coach, business coach, tutor and more. Make and share your own.</span></div>
+    <div class="feature"><b>Dabs for every job</b><span>Coder, maker, security coach, business coach, tutor and more. Make and share your own.</span></div>
   </section>
 
   <section id="hub">
     <h2>D's Hub</h2>
-    <p class="sub">Pals made for D-Agent. Every Pal is free. In the app: Settings › Pals and D's Hub.</p>
-    <div class="note">To add a Pal: open D-Agent › Pals and D's Hub › Browse D's Hub and tap <b>Get free</b>. Or download the Pal file here and open it with D-Agent (Pals › Import). Sign-in and uploading your own Pals are coming later.</div>
+    <p class="sub">Dabs made for D-Agent. Every Dab is free. In the app: Settings › Dabs and D's Hub.</p>
+    <div class="note">To add a Dab: open D-Agent › Dabs and D's Hub › Browse D's Hub and tap <b>Get free</b>. Or download the Dab file here and open it with D-Agent (Dabs › Import). Sign-in and uploading your own Dabs are coming later.</div>
     <div class="tools">
-      <input id="q" type="search" placeholder="Search Pals" aria-label="Search Pals">
+      <input id="q" type="search" placeholder="Search Dabs" aria-label="Search Dabs">
     </div>
     <div class="tools" id="tags"></div>
-    <div class="grid" id="grid"><div class="note">Loading Pals…</div></div>
+    <div class="grid" id="grid"><div class="note">Loading Dabs…</div></div>
     <dialog id="sheet"></dialog>
   </section>
 
@@ -122,7 +122,7 @@
   function file(p) {
     var copy = Object.assign({}, p); delete copy.builtin;
     var blob = new Blob([JSON.stringify(copy, null, 2)], { type: "application/json" });
-    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = p.id + ".dpal"; a.click();
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = p.id + ".dab"; a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
   var cats = [
@@ -170,7 +170,7 @@
     if (p.tags && p.tags.length) s.appendChild(el("div", "by", p.tags.map(function (x) { return "#" + x; }).join("   ")));
     var row = el("div", "actions");
     var close = el("button", "small ghost", "Close"); close.onclick = function () { sheet.close(); };
-    var get = el("button", "small primary", "⬇  Get free (.dpal)"); get.onclick = function () { file(p); };
+    var get = el("button", "small primary", "⬇  Get free (.dab)"); get.onclick = function () { file(p); };
     row.appendChild(close); row.appendChild(get); s.appendChild(row);
     sheet.appendChild(s);
     sheet.showModal();
@@ -184,7 +184,7 @@
       return (!term || hay.indexOf(term) >= 0) && cat[1](p);
     });
     grid.innerHTML = "";
-    if (!shown.length) { grid.appendChild(el("div", "note", tag === "Premium" ? "Premium Pals are coming later. Everything is free for now." : "No Pals match.")); return; }
+    if (!shown.length) { grid.appendChild(el("div", "note", tag === "Premium" ? "Premium Dabs are coming later. Everything is free for now." : "No Dabs match.")); return; }
     shown.forEach(function (p) {
       var card = el("div", "pal"); card.tabIndex = 0;
       card.onclick = function () { openPal(p); };
@@ -215,7 +215,7 @@
     all = (h.pals || []).slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
     renderTags(); render();
   }).catch(function () {
-    grid.innerHTML = ""; grid.appendChild(el("div", "note", "Couldn't load the Pal list. Try again in a minute."));
+    grid.innerHTML = ""; grid.appendChild(el("div", "note", "Couldn't load the Dab list. Try again in a minute."));
   });
 })();
 </script>

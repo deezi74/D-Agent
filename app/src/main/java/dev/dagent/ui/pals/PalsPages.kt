@@ -65,7 +65,7 @@ import java.io.File
 fun PalStrip(g: Graph, openPals: () -> Unit) {
     val p = LocalPalette.current
     val pals = remember { g.pals.all() }
-    Text("Or talk to a Pal", color = p.muted, fontSize = 12.sp)
+    Text("Or talk to a Dab", color = p.muted, fontSize = 12.sp)
     Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         pals.forEach { pal ->
             Column(Modifier.width(64.dp).clickable { g.settings.update { it.copy(activePal = pal.id) } }, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -105,19 +105,19 @@ fun PalsPage(g: Graph, open: (String) -> Unit, back: () -> Unit) {
                 val pal = g.pals.install(PalFormat.decode(text))
                 version++
                 "Added ${pal.name}."
-            }.getOrElse { "That file isn't a Pal: ${it.message}" }
+            }.getOrElse { "That file isn't a Dab: ${it.message}" }
         }
     }
-    Page("Pals", back) {
-        Muted("A Pal is a ready-made companion with its own job, personality and starter questions. It can also use its own model, word settings and voice. Pick one to put it in charge of new messages.")
+    Page("Dabs", back) {
+        Muted("A Dab is a ready-made companion with its own job, personality and starter questions. It can also use its own model, word settings and voice. Pick one to put it in charge of new messages.")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ open("hub") }, colors = ButtonDefaults.buttonColors(containerColor = p.accent)) { Text("Browse D's Hub") }
-            OutlinedButton({ open("pal-edit:") }) { Text("Make a Pal") }
+            OutlinedButton({ open("pal-edit:") }) { Text("Make a Dab") }
             TextButton({ importer.launch(arrayOf("*/*")) }) { Text("Import") }
         }
         if (note.isNotBlank()) Text(note, color = p.accent, fontSize = 13.sp)
         PalRow(
-            emoji = "🙂", color = 0xFF2A2F3A, title = prefs.persona.name, subtitle = "Your everyday assistant (no Pal)",
+            emoji = "🙂", color = 0xFF2A2F3A, title = prefs.persona.name, subtitle = "Your everyday assistant (no Dab)",
             selected = prefs.activePal.isBlank(), onUse = { g.settings.update { it.copy(activePal = "") } },
         )
         Section("Built in")
@@ -224,7 +224,7 @@ fun PalEditor(g: Graph, id: String, back: () -> Unit) {
         g.settings.update { it.copy(activePal = saved.id) }
         return true
     }
-    Page(if (g.pals.get(id) == null) "Make a Pal" else "Edit Pal", back) {
+    Page(if (g.pals.get(id) == null) "Make a Dab" else "Edit Dab", back) {
         Card {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PalFace(start.copy(emoji = emoji, color = color), 56)
@@ -251,7 +251,7 @@ fun PalEditor(g: Graph, id: String, back: () -> Unit) {
         Section("Voice and camera")
         Card {
             val packs = VoicePacks.talk.filter { g.voicePacks.installed(it) }
-            if (packs.isEmpty()) Muted("Download an on-phone voice in Settings > Voice to give this Pal its own voice.")
+            if (packs.isEmpty()) Muted("Download an on-phone voice in Settings > Voice to give this Dab its own voice.")
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip("App's voice", voicePack.isBlank()) { voicePack = ""; voiceId = null }
                 packs.forEach { pk -> pk.voices.forEach { v -> Chip("${pk.name}: ${v.label.substringBefore(" (")}", voicePack == pk.id && voiceId == v.id) { voicePack = pk.id; voiceId = v.id } } }
