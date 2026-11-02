@@ -86,7 +86,15 @@ class Graph(val context: Context) {
     val linux = LinuxComputer(context, workspace.root, skills.dir, bridge, http).also { if (it.installed) it.configure() }
     val browser = BrowserAgent(context)
     val local = LocalModels(context)
-    val search = WebSearch(http) { settings.current.searxUrl }
+    val search = WebSearch(http, { settings.current.searxUrl }) {
+        val tavily = settings.secret(Settings.TAVILY_KEY)
+        val brave = settings.secret(Settings.BRAVE_KEY)
+        when {
+            tavily.isNotBlank() -> WebSearch.TAVILY to tavily
+            brave.isNotBlank() -> WebSearch.BRAVE to brave
+            else -> "" to ""
+        }
+    }
     val scheduler = Scheduler(context)
     val character = CharacterStudio(
         context, http, File(workspace.root, "images/characters"),

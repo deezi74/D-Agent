@@ -187,6 +187,8 @@ class Settings(context: Context) {
     companion object {
         const val POLLINATIONS_KEY = "pollinations"
         const val ELEVENLABS_KEY = "elevenlabs"
+        const val TAVILY_KEY = "search.tavily"
+        const val BRAVE_KEY = "search.brave"
 
         val ACCENTS = listOf(
             "Ember" to 0xFFFF6B35,

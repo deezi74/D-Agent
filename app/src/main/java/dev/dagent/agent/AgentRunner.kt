@@ -403,6 +403,7 @@ class AgentRunner(private val g: Graph) {
         val quick = listOf<Tool>(
             WebSearchTool(g.search),
             WebFetchTool(g.http),
+            dev.dagent.core.tools.CalculateTool(),
             ImageTool(g.http, ws, { g.settings.secret(Settings.POLLINATIONS_KEY) }) { g.settings.provider("openai").apiKey to g.settings.provider("openrouter").apiKey },
             CharacterTool(g.character),
             WebsiteTool(ws),

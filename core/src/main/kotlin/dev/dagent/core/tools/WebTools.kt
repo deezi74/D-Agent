@@ -16,6 +16,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import okhttp3.FormBody
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -26,11 +28,25 @@ import java.net.URLDecoder
 
 data class SearchHit(val title: String, val url: String, val snippet: String, val source: String = "", val age: String = "")
 
-/** Live web search without an API key: DuckDuckGo first, Bing as a fallback, or your own SearXNG. */
-class WebSearch(private val http: OkHttpClient, private val searxUrl: () -> String = { "" }) {
+/**
+ * Live web search. Free with no key: DuckDuckGo first, Bing as a fallback, or your own SearXNG.
+ * Optional keyed services (Tavily, Brave) go first when a key is set, with the free ones as backup.
+ */
+class WebSearch(
+    private val http: OkHttpClient,
+    private val searxUrl: () -> String = { "" },
+    /** (provider id, key): "tavily" or "brave", or ("", "") for the free default. */
+    private val keyed: () -> Pair<String, String> = { "" to "" },
+) {
 
     suspend fun search(query: String, max: Int = 8): List<SearchHit> = withContext(Dispatchers.IO) {
         val errors = mutableListOf<String>()
+        val (provider, key) = keyed()
+        if (key.isNotBlank()) when (provider) {
+            TAVILY -> runCatching { tavily(query, key, max) }
+            BRAVE -> runCatching { brave(query, key, max) }
+            else -> null
+        }?.onSuccess { if (it.isNotEmpty()) return@withContext it.take(max) }?.onFailure { errors += "$provider: ${it.message}" }
         val searx = searxUrl().trim()
         if (searx.isNotEmpty()) runCatching { searxng(searx, query) }.onSuccess { if (it.isNotEmpty()) return@withContext it.take(max) }
             .onFailure { errors += "SearXNG: ${it.message}" }
@@ -85,6 +101,40 @@ class WebSearch(private val http: OkHttpClient, private val searxUrl: () -> Stri
         }.filter { it.url.startsWith("http") }
     }
 
+    internal fun tavily(query: String, key: String, max: Int, base: String = "https://api.tavily.com"): List<SearchHit> {
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("query", JsonPrimitive(query)); put("max_results", JsonPrimitive(max.coerceIn(1, 20))); put("search_depth", JsonPrimitive("basic"))
+        }.toString()
+        val req = Request.Builder().url("$base/search").header("Authorization", "Bearer $key")
+            .post(body.toRequestBody("application/json".toMediaType())).build()
+        val text = http.newCall(req).execute().use { r ->
+            if (!r.isSuccessful) throw IOException(if (r.code == 401 || r.code == 403) "the key was refused" else "HTTP ${r.code}")
+            r.body?.string().orEmpty()
+        }
+        val results = Json.parseToJsonElement(text).jsonObject["results"] as? JsonArray ?: return emptyList()
+        return results.mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            fun str(k: String) = (o[k] as? JsonPrimitive)?.contentOrNull.orEmpty()
+            SearchHit(str("title"), str("url"), str("content").take(400), "tavily")
+        }.filter { it.url.startsWith("http") }
+    }
+
+    internal fun brave(query: String, key: String, max: Int, base: String = "https://api.search.brave.com"): List<SearchHit> {
+        val req = Request.Builder().url("$base/res/v1/web/search?q=${enc(query)}&count=${max.coerceIn(1, 20)}&country=us&search_lang=en")
+            .header("X-Subscription-Token", key).header("Accept", "application/json").build()
+        val text = http.newCall(req).execute().use { r ->
+            if (!r.isSuccessful) throw IOException(if (r.code == 401 || r.code == 403 || r.code == 422) "the key was refused" else "HTTP ${r.code}")
+            r.body?.string().orEmpty()
+        }
+        val web = Json.parseToJsonElement(text).jsonObject["web"] as? JsonObject ?: return emptyList()
+        val results = web["results"] as? JsonArray ?: return emptyList()
+        return results.mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            fun str(k: String) = (o[k] as? JsonPrimitive)?.contentOrNull.orEmpty()
+            SearchHit(Jsoup.parse(str("title")).text(), str("url"), Jsoup.parse(str("description")).text(), "brave", str("age"))
+        }.filter { it.url.startsWith("http") }
+    }
+
     private fun searxng(base: String, query: String): List<SearchHit> {
         val url = "${base.trimEnd('/')}/search?q=${enc(query)}&format=json&language=en-US"
         val body = http.newCall(Request.Builder().url(url).header("User-Agent", UA).build()).execute().use { r ->
@@ -109,6 +159,8 @@ class WebSearch(private val http: OkHttpClient, private val searxUrl: () -> Stri
     }
 
     companion object {
+        const val TAVILY = "tavily"
+        const val BRAVE = "brave"
         const val UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36"
         fun enc(s: String): String = java.net.URLEncoder.encode(s, "UTF-8")
 

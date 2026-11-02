@@ -611,8 +611,12 @@ fun ToolsPage(g: Graph, back: () -> Unit) {
     val prefs by g.settings.state.collectAsState()
     var searx by remember { mutableStateOf(prefs.searxUrl) }
     var pollen by remember { mutableStateOf(g.settings.secret(Settings.POLLINATIONS_KEY)) }
+    var tavily by remember { mutableStateOf(g.settings.secret(Settings.TAVILY_KEY)) }
+    var brave by remember { mutableStateOf(g.settings.secret(Settings.BRAVE_KEY)) }
     fun saveAll() {
         g.settings.update { it.copy(searxUrl = searx) }
+        g.settings.setSecret(Settings.TAVILY_KEY, tavily.trim())
+        g.settings.setSecret(Settings.BRAVE_KEY, brave.trim())
         g.settings.setSecret(Settings.POLLINATIONS_KEY, pollen)
     }
     Page("Tools and behavior", { saveAll(); back() }) {
@@ -645,6 +649,9 @@ fun ToolsPage(g: Graph, back: () -> Unit) {
         Section("Web search")
         Muted("Works without a key (DuckDuckGo, then Bing). Add your own SearXNG server for more control.")
         OutlinedTextField(searx, { searx = it }, label = { Text("SearXNG URL (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Muted("Optional search services with cleaner results. Tavily's free plan (1,000 searches a month at tavily.com) needs no card. Brave's free plan may ask for a card to verify. With a key set it's used first; the free search stays as backup.")
+        OutlinedTextField(tavily, { tavily = it }, label = { Text("Tavily key (optional, free)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(brave, { brave = it }, label = { Text("Brave Search key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         Section("Images")
         Muted("Pictures come from Pollinations. It works without a key; a free key from enter.pollinations.ai lifts the limits.")
         OutlinedTextField(pollen, { pollen = it }, label = { Text("Pollinations key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
