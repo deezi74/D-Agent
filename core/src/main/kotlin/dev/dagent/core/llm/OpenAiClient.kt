@@ -111,6 +111,16 @@ class OpenAiClient(
         return b
     }
 
+    /**
+     * Qwen3's original models think out loud before every answer unless told /no_think, which on a
+     * home PC or phone can take longer than the answer itself. With Thinking off, they skip it.
+     * (Instruct/Thinking-only versions ignore the switch, so they're left alone.)
+     */
+    internal fun hybridThinker(model: String): Boolean {
+        val m = model.lowercase()
+        return m.contains("qwen3") && !m.contains("instruct") && !m.contains("thinking") && !m.contains("2507") && !m.contains("coder")
+    }
+
     internal fun buildBody(req: ChatRequest): JsonObject = buildJsonObject {
         put("model", req.model)
         put("stream", true)
@@ -124,7 +134,7 @@ class OpenAiClient(
             ReasoningStyle.OPENROUTER -> putJsonObject("reasoning") { put("effort", "medium") }
             ReasoningStyle.NONE -> Unit
         }
-        put("messages", encodeMessages(req.system, req.messages))
+        put("messages", encodeMessages(if (!req.think && hybridThinker(req.model)) req.system + "\n\n/no_think" else req.system, req.messages))
         if (req.tools.isNotEmpty()) {
             putJsonArray("tools") {
                 req.tools.forEach { t ->

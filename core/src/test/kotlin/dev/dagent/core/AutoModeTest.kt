@@ -35,3 +35,15 @@ class AutoModeTest {
         assertFalse(agent("now make the header blue"))
     }
 }
+
+class NoThinkTest {
+    private val client = dev.dagent.core.llm.OpenAiClient(okhttp3.OkHttpClient(), "http://x/v1", "", emptyMap(), dev.dagent.core.llm.ReasoningStyle.NONE)
+    private fun sys(model: String, think: Boolean) = client.buildBody(dev.dagent.core.llm.ChatRequest(model, "Be nice.", listOf(Msg.user("hi")), think = think)).toString()
+
+    @Test fun qwen3SkipsThinkingWhenOff() {
+        assertTrue(sys("qwen/qwen3-14b", think = false).contains("/no_think"))
+        assertFalse(sys("qwen/qwen3-14b", think = true).contains("/no_think"))
+        assertFalse(sys("qwen3-30b-a3b-instruct-2507", think = false).contains("/no_think"))
+        assertFalse(sys("llama-3.2-3b", think = false).contains("/no_think"))
+    }
+}
