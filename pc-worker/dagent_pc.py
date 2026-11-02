@@ -310,7 +310,154 @@ def tool_specs() -> list:
         fn("list_files", "List files in a workspace folder.", {"path": s}, []),
         fn("web_search", "Search the web. Returns titles, links and snippets.", {"query": s}, ["query"]),
         fn("web_fetch", "Read a web page as text.", {"url": s}, ["url"]),
+        fn("ghidra", "Reverse engineer a program with Ghidra (free decompiler): turns an EXE, DLL, ELF, .so or firmware file in the "
+           "workspace into readable C code, saved under reverse/. Give function to decompile just one (name or address). "
+           "Only for the owner's own files, CTFs, practice crackmes or software they are allowed to analyze. "
+           "The first use downloads Ghidra and Java (about 600 MB).",
+           {"path": s, "function": s}, ["path"]),
     ]
+
+
+# ---- Ghidra (reverse engineering on the PC) ---------------------------------------------------
+
+TOOLS_DIR = HOME / "tools"
+GHIDRA_SCRIPT = r"""//Decompiles a program for D-Agent: every function, or one by name or address.
+//@category DAgent
+import ghidra.app.script.GhidraScript;
+import ghidra.app.decompiler.DecompInterface;
+import ghidra.app.decompiler.DecompileResults;
+import ghidra.program.model.listing.Function;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+
+public class DAgentDecompile extends GhidraScript {
+    @Override
+    public void run() throws Exception {
+        String[] a = getScriptArgs();
+        File out = new File(a[0]);
+        String only = a.length > 1 ? a[1].trim() : "";
+        String addr = only.toLowerCase().replace("0x", "");
+        DecompInterface d = new DecompInterface();
+        d.openProgram(currentProgram);
+        try (PrintWriter w = new PrintWriter(new FileWriter(out))) {
+            w.println("// " + currentProgram.getName() + " | " + currentProgram.getLanguageID() + " | " + currentProgram.getExecutableFormat());
+            int n = 0;
+            for (Function f : currentProgram.getFunctionManager().getFunctions(true)) {
+                if (monitor.isCancelled()) break;
+                if (!only.isEmpty()) {
+                    if (!f.getName().equals(only) && !f.getEntryPoint().toString().toLowerCase().endsWith(addr)) continue;
+                } else if (f.isExternal() || f.isThunk()) continue;
+                DecompileResults r = d.decompileFunction(f, 60, monitor);
+                w.println();
+                w.println("// ---- " + f.getName() + " @ " + f.getEntryPoint() + " (" + f.getBody().getNumAddresses() + " bytes)");
+                w.println(r.decompileCompleted() ? r.getDecompiledFunction().getC() : "// could not decompile: " + r.getErrorMessage());
+                if (++n >= 3000) break;
+            }
+        }
+        d.dispose();
+    }
+}
+"""
+
+
+def _download(url: str, dest: Path) -> None:
+    req = urllib.request.Request(url, headers={"User-Agent": "D-Agent-PC"})
+    with urllib.request.urlopen(req, timeout=600) as r, open(dest, "wb") as f:
+        shutil.copyfileobj(r, f, 1 << 20)
+
+
+def _unpack(archive: Path, into: Path) -> Path:
+    """Unpacks a zip or tar.gz and returns the single top folder inside it."""
+    into.mkdir(parents=True, exist_ok=True)
+    before = set(into.iterdir())
+    shutil.unpack_archive(str(archive), str(into))
+    new = [p for p in into.iterdir() if p not in before and p.is_dir()]
+    archive.unlink(missing_ok=True)
+    if not new:
+        raise RuntimeError(f"Nothing came out of {archive.name}")
+    return new[0]
+
+
+def ghidra_home() -> Path | None:
+    for p in sorted(TOOLS_DIR.glob("ghidra_*"), reverse=True):
+        if (p / "support").is_dir():
+            return p
+    return None
+
+
+def ghidra_setup() -> str:
+    """Downloads Ghidra (free, from the NSA's GitHub) and a Java 21 runtime (Eclipse Temurin) into ~/.dagent-pc/tools."""
+    TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+    done = []
+    jdk = next((p for p in TOOLS_DIR.glob("jdk-21*") if p.is_dir()), None)
+    if jdk is None:
+        osn = "windows" if IS_WINDOWS else ("mac" if platform.system() == "Darwin" else "linux")
+        arch = "aarch64" if platform.machine().lower() in ("arm64", "aarch64") else "x64"
+        ext = ".zip" if IS_WINDOWS else ".tar.gz"
+        tmp = TOOLS_DIR / ("jdk" + ext)
+        log("Downloading Java 21 for Ghidra")
+        _download(f"https://api.adoptium.net/v3/binary/latest/21/ga/{osn}/{arch}/jdk/hotspot/normal/eclipse", tmp)
+        jdk = _unpack(tmp, TOOLS_DIR)
+        done.append(f"Java: {jdk.name}")
+    home = ghidra_home()
+    if home is None:
+        rel = json.loads(urllib.request.urlopen(urllib.request.Request(
+            "https://api.github.com/repos/NationalSecurityAgency/ghidra/releases/latest", headers={"User-Agent": "D-Agent-PC"}), timeout=60).read())
+        asset = next(a for a in rel["assets"] if re.match(r"ghidra_.*_PUBLIC_.*\.zip$", a["name"]))
+        tmp = TOOLS_DIR / asset["name"]
+        log("Downloading " + asset["name"])
+        _download(asset["browser_download_url"], tmp)
+        home = _unpack(tmp, TOOLS_DIR)
+        done.append(f"Ghidra: {home.name}")
+    java_home = jdk / "Contents" / "Home" if (jdk / "Contents" / "Home").is_dir() else jdk
+    props = home / "support" / "launch.properties"
+    text = props.read_text(encoding="utf-8") if props.is_file() else ""
+    text = re.sub(r"(?m)^JAVA_HOME_OVERRIDE=.*$", "", text).rstrip() + f"\nJAVA_HOME_OVERRIDE={java_home.as_posix()}\n"
+    props.write_text(text, encoding="utf-8")
+    scripts = HOME / "ghidra_scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    (scripts / "DAgentDecompile.java").write_text(GHIDRA_SCRIPT, encoding="utf-8")
+    if not IS_WINDOWS:
+        for sh in (home / "support").glob("*"):
+            if sh.suffix in ("", ".sh") and sh.is_file():
+                sh.chmod(sh.stat().st_mode | 0o111)
+        for sh in (home / "Ghidra").rglob("*"):
+            if sh.is_file() and sh.parent.name in ("os", "linux_x86_64", "linux_arm_64", "mac_x86_64", "mac_arm_64"):
+                sh.chmod(sh.stat().st_mode | 0o111)
+    return "Ghidra is ready. " + ("; ".join(done) if done else "(already installed)")
+
+
+def ghidra_decompile(path: Path, function: str, ws: Path, timeout: int = 1800) -> str:
+    home = ghidra_home()
+    if home is None:
+        ghidra_setup()
+        home = ghidra_home()
+    out_dir = ws / "reverse"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", path.name)
+    out = out_dir / (safe + (("." + re.sub(r"[^A-Za-z0-9_]", "_", function)) if function else "") + ".c")
+    proj = TOOLS_DIR / "projects"
+    proj.mkdir(parents=True, exist_ok=True)
+    launcher = home / "support" / ("analyzeHeadless.bat" if IS_WINDOWS else "analyzeHeadless")
+    argv = [str(launcher), str(proj), "dagent_" + uuid.uuid4().hex[:8], "-import", str(path),
+            "-scriptPath", str(HOME / "ghidra_scripts"), "-postScript", "DAgentDecompile.java", str(out)]
+    if function:
+        argv.append(function)
+    argv += ["-deleteProject", "-analysisTimeoutPerFile", str(max(60, timeout - 120))]
+    if not (HOME / "ghidra_scripts" / "DAgentDecompile.java").is_file():
+        ghidra_setup()
+    try:
+        p = subprocess.run(argv, capture_output=True, timeout=timeout, stdin=subprocess.DEVNULL,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if IS_WINDOWS else 0)
+    except subprocess.TimeoutExpired:
+        return f"Ghidra was still working after {timeout} s; try a single function."
+    if not out.is_file():
+        log_text = ((p.stdout or b"") + (p.stderr or b"")).decode("utf-8", "replace")
+        return "Ghidra couldn't finish:\n" + clip(log_text[-4000:], 4000)
+    body = out.read_text(encoding="utf-8", errors="replace")
+    funcs = body.count("// ---- ")
+    return f"Decompiled {funcs} function(s) to {out}\n\n" + clip(body, 14000)
 
 
 # ---- Tasks -----------------------------------------------------------------------------------
@@ -520,6 +667,13 @@ class Worker:
                 return web_search(a["query"])
             if name == "web_fetch":
                 return web_fetch(a["url"])
+            if name == "ghidra":
+                if not self.cfg.get("allow_shell", True):
+                    return "Error: running programs is turned off in config.json (allow_shell)."
+                target = inside(ws, a["path"])
+                if not target.is_file():
+                    return f"Error: no file at {target}."
+                return ghidra_decompile(target, str(a.get("function") or "").strip(), ws)
             return f"Error: there's no tool named {name}."
         except KeyError as e:
             return f"Error: missing argument {e}."

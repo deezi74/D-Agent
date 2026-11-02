@@ -80,3 +80,10 @@ curl -fsSL https://raw.githubusercontent.com/deezi74/D-Agent/claude/project-thre
 On a phone it listens only on 127.0.0.1, uses FreeLLMAPI (`http://localhost:3001/v1`) until the
 app hands it another model ("Use the app's AI"), and holds a Termux wake lock. Install
 Termux:Boot from F-Droid to start it when the phone turns on; `bash ~/.dagent-pc/start.sh` starts it by hand.
+
+## Reverse engineering with Ghidra
+
+The worker has a `ghidra` tool. Ask from the phone, for example: "On my PC, decompile crackme.exe with Ghidra and explain main".
+The first time, it downloads Ghidra (from github.com/NationalSecurityAgency/ghidra) and a Java 21 runtime (Eclipse Temurin)
+into `~/.dagent-pc/tools` (about 600 MB, free). Results are saved as C code under `reverse/` in the workspace.
+Use it only on your own files, CTFs, practice crackmes or software you're allowed to analyze.
