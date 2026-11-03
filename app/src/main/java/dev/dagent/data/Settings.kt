@@ -2,8 +2,6 @@ package dev.dagent.data
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import dev.dagent.core.agent.Persona
 import dev.dagent.core.llm.ApiKind
 import dev.dagent.core.llm.ProviderPreset
@@ -61,17 +59,42 @@ data class AppPrefs(
     val localUnloadInBackground: Boolean = false,
 )
 
-/** Plain preferences in one file; API keys in an encrypted one. */
+/**
+ * Plain preferences in one file; API keys in [SecretStore] (Android Keystore, AES-256-GCM).
+ * Secrets are never written in plain text: if the Keystore can't be used, secrets read as empty,
+ * saving one does nothing, and [secretsError] says why so the UI can show it.
+ */
 class Settings(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("dagent", Context.MODE_PRIVATE)
-    private val secrets: SharedPreferences = runCatching {
-        EncryptedSharedPreferences.create(
-            context, "dagent_keys",
-            MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
-    }.getOrElse { context.getSharedPreferences("dagent_keys_fallback", Context.MODE_PRIVATE) }
+    private val secrets: SecretStore?
+    private val _secretsError = MutableStateFlow<String?>(null)
+    /** Non-null when secure storage is unavailable or a secret couldn't be read or saved. */
+    val secretsError: StateFlow<String?> = _secretsError.asStateFlow()
+
+    init {
+        val opened = SecretStore.open(context)
+        secrets = opened.getOrNull()
+        opened.exceptionOrNull()?.let {
+            _secretsError.value = "Secure storage (Android Keystore) isn't working on this phone, so API keys and other secrets can't be saved. (${it.javaClass.simpleName}: ${it.message ?: "no details"})"
+        }
+    }
+
+    private fun readSecret(name: String): String {
+        val s = secrets ?: return ""
+        return runCatching { s.get(name) ?: "" }.getOrElse {
+            _secretsError.value = "A saved secret couldn't be decrypted ($name). Enter it again."
+            ""
+        }
+    }
+
+    private fun writeSecret(name: String, value: String) {
+        val s = secrets ?: run {
+            _secretsError.value = _secretsError.value ?: "Secure storage isn't available, so this secret wasn't saved."
+            return
+        }
+        runCatching { if (value.isEmpty()) s.remove(name) else s.put(name, value) }
+            .onFailure { _secretsError.value = "Couldn't save a secret securely (${it.message ?: it.javaClass.simpleName})." }
+    }
 
     private val _state = MutableStateFlow(load())
     val state: StateFlow<AppPrefs> = _state.asStateFlow()
@@ -161,7 +184,7 @@ class Settings(context: Context) {
             preset,
             baseUrl = prefs.getString("prov.$id.url", null) ?: preset.baseUrl,
             model = prefs.getString("prov.$id.model", null) ?: preset.defaultModel,
-            apiKey = secrets.getString("key.$id", "") ?: "",
+            apiKey = readSecret("key.$id"),
         )
     }
 
@@ -169,7 +192,7 @@ class Settings(context: Context) {
 
     fun saveProvider(id: String, baseUrl: String, model: String, apiKey: String) {
         prefs.edit().putString("prov.$id.url", baseUrl.trim()).putString("prov.$id.model", model.trim()).apply()
-        secrets.edit().putString("key.$id", apiKey.trim()).apply()
+        writeSecret("key.$id", apiKey.trim())
         _providersVersion.value++
     }
 
@@ -178,9 +201,9 @@ class Settings(context: Context) {
         _providersVersion.value++
     }
 
-    fun secret(name: String): String = secrets.getString("s.$name", "") ?: ""
+    fun secret(name: String): String = readSecret("s.$name")
     fun setSecret(name: String, value: String) {
-        secrets.edit().putString("s.$name", value.trim()).apply()
+        writeSecret("s.$name", value.trim())
         _providersVersion.value++
     }
 
