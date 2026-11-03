@@ -7,14 +7,20 @@ name: Android APK
 # DAGENT_KEY_ALIAS / DAGENT_KEY_PASSWORD exist, that key signs the APK. Otherwise a key is made
 # once and kept in the Actions cache, so each new APK installs over the last one.
 
+#
+# The "check" job runs on every push and pull request: core unit tests, a debug APK build (the real
+# compile check for app/, which can't be built without an Android SDK) and the debug APK as an
+# artifact. The release job only runs for pushes to main and claude/** branches.
+
 on:
   push:
-    branches: [main, "claude/**"]
+    paths-ignore: ["**.md"]
+  pull_request:
     paths-ignore: ["**.md"]
   workflow_dispatch:
 
 concurrency:
-  group: apk-${{ github.ref }}
+  group: apk-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -25,7 +31,45 @@ env:
   LLAMA_TAG: b12017
 
 jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-35 build-tools;35.0.0
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Voice engine (sherpa-onnx)
+        run: bash scripts/fetch-sherpa.sh app/libs
+
+      - name: Core tests
+        run: ./gradlew --no-daemon :core:test
+
+      - name: Debug APK (compile check for app/)
+        env:
+          DAGENT_GITHUB_CLIENT_ID: ${{ secrets.DAGENT_GITHUB_CLIENT_ID }}
+          DAGENT_GOOGLE_CLIENT_ID: ${{ secrets.DAGENT_GOOGLE_CLIENT_ID }}
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: D-Agent-debug-${{ github.run_number }}
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
   apk:
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/claude/'))
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -121,6 +165,9 @@ jobs:
           fi
 
       - name: Build APK
+        env:
+          DAGENT_GITHUB_CLIENT_ID: ${{ secrets.DAGENT_GITHUB_CLIENT_ID }}
+          DAGENT_GOOGLE_CLIENT_ID: ${{ secrets.DAGENT_GOOGLE_CLIENT_ID }}
         run: |
           export DAGENT_BUILD=$((GITHUB_RUN_NUMBER))
           echo "sdk.dir=$ANDROID_HOME" > local.properties
