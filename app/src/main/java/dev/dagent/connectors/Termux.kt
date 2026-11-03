@@ -215,9 +215,11 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
             kotlinx.coroutines.delay(2_000)
             if (termux.portOpen(3001)) return ToolResult.ok("FreeLLMAPI is running on http://localhost:3001/v1 (a Termux session named FreeLLMAPI keeps it going).")
         }
-        val log = termux.run("ls -d ~/freellmapi >/dev/null 2>&1 && echo HAS_DIR || echo NO_DIR", 15_000)
+        val log = termux.run("ls -d ~/freellmapi >/dev/null 2>&1 && echo HAS_DIR || echo NO_DIR; tail -n 15 ~/.dagent/freellmapi.log 2>/dev/null", 15_000)
         if (log.stdout.contains("NO_DIR")) return ToolResult.error("There's no ~/freellmapi folder in Termux, so there's nothing to start. Clone FreeLLMAPI into ~/freellmapi first.")
-        return ToolResult.error("Started FreeLLMAPI in Termux but port 3001 didn't open within 90 seconds. Ask the person to open Termux and look at the FreeLLMAPI session for the error." +
+        val tail = log.stdout.substringAfter("HAS_DIR").trim().takeLast(1500)
+        return ToolResult.error("Started FreeLLMAPI in Termux but port 3001 didn't open within 90 seconds." +
+            (if (tail.isNotBlank()) " Its last output:\n$tail\n" else " Ask the person to open Termux and look at the FreeLLMAPI session for the error.") +
             if (log.error != null) " (Termux also said: ${log.error}$SETUP_HINT)" else "")
     }
 
@@ -335,10 +337,14 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
 
         /** Starts FreeLLMAPI in Termux the way the person runs it: ~/freellmapi, wake lock, npm run dev. */
         val FREELLMAPI_SCRIPT = """
-            cd ~/freellmapi || { echo "No ~/freellmapi folder. Clone FreeLLMAPI there first."; exit 1; }
-            command -v termux-wake-lock >/dev/null && termux-wake-lock
-            [ -d node_modules ] || npm install
-            npm run dev
+            mkdir -p ~/.dagent
+            {
+              cd ~/freellmapi || { echo "No ~/freellmapi folder. Clone FreeLLMAPI there first."; exit 1; }
+              command -v termux-wake-lock >/dev/null && termux-wake-lock
+              [ -d node_modules ] || npm install
+              npm run dev
+            } 2>&1 | tee ~/.dagent/freellmapi.log
+            echo; echo "FreeLLMAPI stopped (see above). Press Enter to close this session."; read _
         """.trimIndent()
 
         /** One-time Android build setup inside Termux (aarch64): JDK, Gradle, aapt2 and the SDK platform. */
