@@ -118,6 +118,11 @@ object Providers {
         val m = message.lowercase()
         val local = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
         return when {
+            // OkHttp on Android: the app's network security config only allows plain http to this phone.
+            m.contains("cleartext") && m.contains("not permitted") ->
+                "D-Agent only sends plain http:// to servers on this phone (localhost, 127.0.0.1). " +
+                    "Use an https:// address for $baseUrl (for example a reverse proxy or Tailscale HTTPS), " +
+                    "or run the server on this phone."
             m.contains("timeout") || m.contains("timed out") ->
                 "The model stopped answering (no reply for a while, even after a retry). " +
                     (if (local) "If you use FreeLLMAPI, check it's still running in Termux; Android sometimes stops it in the background. " else "") +
