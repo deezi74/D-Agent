@@ -13,17 +13,10 @@ import dev.dagent.R
 import dev.dagent.browser.BrowserTool
 import dev.dagent.character.CharacterTool
 import dev.dagent.media.MakeVideoTool
-import dev.dagent.connectors.EmailTool
 import dev.dagent.connectors.TermuxTool
 import dev.dagent.core.places.GeoPoint
-import dev.dagent.core.tools.GitHubClient
-import dev.dagent.core.tools.GitHubTool
-import dev.dagent.core.tools.AppBuilderTool
 import dev.dagent.core.tools.WebsiteTool
 import dev.dagent.core.agent.SlimTool
-import dev.dagent.core.tools.AiCallClient
-import dev.dagent.core.tools.AiCallTool
-import dev.dagent.core.tools.PhoneBuilder
 import dev.dagent.core.tools.PlacesTool
 import dev.dagent.core.tools.WeatherTool
 import dev.dagent.core.agent.AgentEvent
@@ -257,6 +250,9 @@ class AgentRunner(private val g: Graph) {
                 }
                 override suspend fun confirm(title: String, detail: String) = g.interactions.confirm(title, detail)
             }
+            // Ask MCP servers for their tools if it's been a while (bounded; a dead server only
+            // drops its own tools and shows an error on the Connectors screen).
+            runCatching { g.connectorHub.refreshMcp() }
             var finalText = ""
             var round = 0
             while (true) {
@@ -413,27 +409,9 @@ class AgentRunner(private val g: Graph) {
             RememberTool(g.memory),
             RecallTool(g.memory),
         )
-        val connected = buildList<Tool> {
-            if (g.connectors.emailAccounts.isNotEmpty()) add(EmailTool(g.email) { g.connectors.emailOrganize })
-            // Offered whenever Termux is installed, so "start FreeLLMAPI" always reaches it; the tool
-            // itself explains any missing setup step.
-            val termuxTool = if (g.connectors.termuxOn || g.termux.isInstalled()) TermuxTool(g.termux) { true } else null
-            if (g.connectors.githubToken.isNotBlank()) {
-                val gh = GitHubClient({ g.connectors.githubToken }, http = g.http)
-                add(GitHubTool(gh) { g.connectors.githubWrite })
-                add(AppBuilderTool(
-                    gh, { g.connectors.builtApps }, { g.connectors.builtApps = g.connectors.builtApps + it }, { g.connectors.githubToken },
-                    phone = termuxTool?.let { t -> PhoneBuilder { script -> t.startJob(script).text } },
-                ))
-            }
-            if (termuxTool != null) add(termuxTool)
-            if (g.connectors.pcUrl.isNotBlank() && g.connectors.pcCode.isNotBlank()) {
-                add(dev.dagent.core.tools.PcTool(dev.dagent.connectors.PcWatch.client(g), g.workspace) { id, title ->
-                    dev.dagent.connectors.PcWatch.add(g.context, g, id, title)
-                })
-            }
-            if (g.connectors.aiCallKey.isNotBlank()) add(AiCallTool(AiCallClient({ g.connectors.aiCallKey }, http = g.http)) { g.connectors.ownerName() })
-        }
+        // Email, GitHub, Google, Termux, PC, AI calls and every MCP server: one registry decides
+        // which are connected and hands over their tools (built-in names win on a clash).
+        val connected = g.connectorHub.tools(agentMode, quick.map { it.name }.toSet())
         if (!agentMode) return quick + connected
         return quick + connected + listOf(
             ForgetTool(g.memory),
@@ -484,6 +462,7 @@ class AgentRunner(private val g: Graph) {
             g.local.ensureRunning(file, prefs.localContext, prefs.localThreads, g.loadOpts())
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
+        runCatching { g.connectorHub.refreshMcp() }
         val tools = tools(agentMode = true, vision = false).filterNot { it.name == "plan" }
         // The changing parts (task note, clock) go last so the start of the prompt stays cacheable.
         val system = PromptBuilder.build(prefs.persona, Situation(place = whereNow(), linuxReady = g.linux.installed, agentMode = true), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet(),
@@ -537,6 +516,7 @@ class AgentRunner(private val g: Graph) {
             g.local.ensureRunning(file, prefs.localContext, prefs.localThreads, g.loadOpts())
         }
         val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
+        runCatching { g.connectorHub.refreshMcp() }
         val tools = tools(agentMode = prefs.agentMode || prefs.autoMode, vision = images.isNotEmpty()).filterNot { it.name == "plan" }
         val system = PromptBuilder.build(prefs.persona, Situation(place = whereNow(), linuxReady = g.linux.installed, agentMode = prefs.agentMode || prefs.autoMode), g.memory.forPrompt(), g.skills.list(), tools.map { it.name }.toSet(),
             extra = note + PromptBuilder.clockNote(ZonedDateTime.now()))

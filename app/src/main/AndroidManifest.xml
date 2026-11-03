@@ -79,6 +79,30 @@
             </intent-filter>
         </activity>
 
+        <!-- OAuth sign-in comes back here: Google uses the package name as its scheme
+             (<package>:/oauth2redirect, as Google's Android client type requires) and MCP servers
+             use dagent://oauth. The state and PKCE verifier are checked before any token is kept. -->
+        <activity
+            android:name=".connectors.OAuthRedirectActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${applicationId}" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="dagent" android:host="oauth" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".service.AgentService"
             android:exported="false"

@@ -63,6 +63,8 @@ class Graph(val context: Context) {
         .build()
 
     val settings = Settings(context)
+    /** Every connector and MCP server; lazy because it reads other parts of the graph. */
+    val connectorHub by lazy { dev.dagent.data.ConnectorHub(this) }
     val chats = ChatStore(context.filesDir)
     val workspace = Workspace(File(context.filesDir, "workspace"))
     val memory = MemoryStore(File(context.filesDir, "memory"))

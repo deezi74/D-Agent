@@ -7,6 +7,17 @@ plugins {
 
 val buildNumber = (System.getenv("DAGENT_BUILD") ?: "1").toInt()
 
+// OAuth client IDs for the GitHub and Google connectors (see README, "Connectors and sign-in").
+// Read from local.properties (dagent.githubClientId / dagent.googleClientId) or the environment
+// (DAGENT_GITHUB_CLIENT_ID / DAGENT_GOOGLE_CLIENT_ID, handy as CI secrets). Client IDs aren't
+// secrets, but none is built in: blank means "not set up", and the app says so.
+val localProps = java.util.Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun oauthId(prop: String, env: String): String =
+    (localProps.getProperty(prop) ?: System.getenv(env) ?: "").trim().replace("\"", "")
+
 android {
     namespace = "dev.dagent"
     compileSdk = 35
@@ -17,6 +28,8 @@ android {
         targetSdk = 35
         versionCode = buildNumber
         versionName = "1.0.$buildNumber"
+        buildConfigField("String", "GITHUB_CLIENT_ID", "\"${oauthId("dagent.githubClientId", "DAGENT_GITHUB_CLIENT_ID")}\"")
+        buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${oauthId("dagent.googleClientId", "DAGENT_GOOGLE_CLIENT_ID")}\"")
         ndk {
             // The Linux computer and the on-phone model server are built for 64-bit ARM.
             abiFilters += listOf("arm64-v8a")
