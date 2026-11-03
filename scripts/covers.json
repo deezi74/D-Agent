@@ -1,5 +1,5 @@
 {
- "style": "vibrant cinematic digital illustration, wide banner, bright saturated colors, glowing highlights, high contrast, sharp detail, professional key art, no text, no letters, no logos, no watermark",
+ "style": "vibrant cinematic digital illustration, wide banner, bright saturated colors, glowing highlights, high contrast, sharp detail, no text, no letters, no logos, no watermark",
  "covers": {
   "byte": {
    "art": "a glowing holographic code editor floating above a sleek laptop in a dark neon-lit room, lines of colorful code, a small friendly robot assistant pointing at the screen",
@@ -38,8 +38,8 @@
    "seed": 1296
   },
   "skillet": {
-   "art": "a sizzling cast iron skillet with colorful vegetables and herbs in a warm rustic kitchen, steam rising, fresh ingredients on a cutting board",
-   "seed": 1333
+   "art": "overhead view of a sizzling cast iron skillet full of colorful roasted vegetables, garlic and herbs on a rustic wooden table, steam rising, warm golden light, food photography",
+   "seed": 1340
   },
   "rep": {
    "art": "a determined athlete doing push-ups in a sunlit living room, motion energy lines, dumbbells and a water bottle nearby",
@@ -82,20 +82,20 @@
    "seed": 1703
   },
   "recon": {
-   "art": "a telescope pointed at a glowing network map of nodes and connections in the night sky, a bug-shaped constellation",
-   "seed": 1740
+   "art": "a lone hacker in a hoodie on a rooftop at night looking through binoculars at a glowing city where buildings are connected by bright network lines, purple and cyan",
+   "seed": 1747
   },
   "webtest": {
    "art": "a giant glowing spider web made of web browser windows and code, a magnifying glass inspecting a strand, dark blue",
    "seed": 1777
   },
   "packets": {
-   "art": "streams of glowing data packets flowing between a Wi-Fi router and devices like rivers of light, green matrix tones",
-   "seed": 1814
+   "art": "glowing streams of colorful data packets flowing like light trails from a Wi-Fi router to a laptop and phone on a desk at night, green and blue neon",
+   "seed": 1821
   },
   "reverse": {
-   "art": "a translucent ghost hovering over a disassembled circuit board and floating assembly code, eerie teal light",
-   "seed": 1851
+   "art": "a friendly translucent ghost holding a magnifying glass over an open circuit board with glowing chips, floating lines of assembly code, teal and purple light",
+   "seed": 1858
   },
   "blueteam": {
    "art": "a security operations center with big screens showing maps and alerts, an analyst in a hoodie watching, deep blue tones",
@@ -162,8 +162,8 @@
    "seed": 2443
   },
   "deals": {
-   "art": "a shopping bag with glowing price tags and a magnifying glass comparing two gadgets, bright clean background",
-   "seed": 2480
+   "art": "a happy shopper holding a smartphone showing a big green price drop, shopping bags and glowing sale tags floating around, bright cheerful store background",
+   "seed": 2487
   },
   "kids": {
    "art": "a friendly cartoon owl wearing glasses helping a child with homework at a desk, colorful school supplies, cheerful",
