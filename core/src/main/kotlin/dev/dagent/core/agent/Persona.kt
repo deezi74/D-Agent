@@ -63,6 +63,8 @@ object PromptBuilder {
         memory: String,
         skills: List<SkillLibrary.Skill>,
         toolNames: Set<String>,
+        /** Notes that change from run to run (clock, background-task note); always placed at the very end. */
+        extra: String? = null,
     ): String = buildString {
         append("You are ${persona.name}, a personal AI agent that lives on the person's Android phone (the app is D-Agent).")
         if (persona.userName.isNotBlank()) append(" You work for ${persona.userName}.")
@@ -70,19 +72,6 @@ object PromptBuilder {
         if (persona.role.isNotBlank()) append("\n# Your role as ${persona.name}\n").append(persona.role.trim()).append('\n')
         append("Answer in the language the person writes in. Use Markdown when it helps (lists, tables, code blocks), not for one-liners.\n")
 
-        // Only things that rarely change go here. The system prompt is the start of every request, and
-        // local servers (LM Studio, the phone) reuse their work on an unchanged start; a clock that ticks
-        // every minute would make them re-read the whole prompt and every tool on each message.
-        append("\n# Right now\n")
-        append("- Today: ").append(situation.now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US)))
-        append(" (").append(situation.now.zone.id).append(")\n")
-        if (situation.place.isNotBlank()) append("- Approximate location: ").append(situation.place).append('\n')
-        else append("- Location: unknown. For weather, places or anything local, leave the place out so the phone looks it up; if that fails, ask where they are. Never assume a city. When they say where they live, save it with remember and use it.\n")
-        if (situation.device.isNotBlank()) append("- Phone: ").append(situation.device).append('\n')
-        append("When the person asks the time, the phone's clock is attached to their message; never guess it. Do not recite these facts unprompted.\n")
-
-        if (persona.aboutUser.isNotBlank()) append("\n# About the person (written by them)\n").append(persona.aboutUser.trim()).append('\n')
-        if (memory.isNotBlank()) append("\n# What you remember about them\n").append(memory).append('\n')
 
         append("\n# How you work\n")
         if (situation.agentMode) {
@@ -116,5 +105,23 @@ object PromptBuilder {
             append("\n# Skills\nWhen a task matches one of these, read it with the skill tool first:\n")
             skills.forEach { append("- ").append(it.name).append(": ").append(it.description).append('\n') }
         }
+
+        // Memory changes only when something is remembered, so it sits after the fixed instructions.
+        if (persona.aboutUser.isNotBlank()) append("\n# About the person (written by them)\n").append(persona.aboutUser.trim()).append('\n')
+        if (memory.isNotBlank()) append("\n# What you remember about them\n").append(memory).append('\n')
+
+        // Last on purpose: everything above is byte-identical between runs, so local servers
+        // (llama.cpp cache_prompt, LM Studio) reuse their work on the unchanged start. The date,
+        // place and phone can change, so they come after it; the minute-by-minute clock never
+        // goes in the system prompt at all (see [clockNote]).
+        append("\n# Right now\n")
+        append("- Today: ").append(situation.now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US)))
+        append(" (").append(situation.now.zone.id).append(")\n")
+        if (situation.place.isNotBlank()) append("- Approximate location: ").append(situation.place).append('\n')
+        else append("- Location: unknown. For weather, places or anything local, leave the place out so the phone looks it up; if that fails, ask where they are. Never assume a city. When they say where they live, save it with remember and use it.\n")
+        if (situation.device.isNotBlank()) append("- Phone: ").append(situation.device).append('\n')
+        append("When the person asks the time, the phone's clock is attached to their message; never guess it. Do not recite these facts unprompted.\n")
+
+        extra?.let { if (it.isNotBlank()) append('\n').append(it.trim()).append('\n') }
     }
 }

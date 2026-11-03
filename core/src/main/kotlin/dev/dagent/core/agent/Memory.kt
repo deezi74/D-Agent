@@ -44,8 +44,20 @@ class MemoryStore(dir: File) {
             .filter { it.second > 0 }.sortedByDescending { it.second }.map { it.first }
     }
 
-    /** The part of memory included in the prompt: newest facts first, within [budget] characters. */
-    fun forPrompt(budget: Int = 5_000): String {
+    private var cached: Triple<Long, Long, Int>? = null
+    private var cachedText = ""
+
+    /**
+     * The part of memory included in the prompt: newest facts first, within [budget] characters.
+     * Cached until memory.md changes (size or modified time), so building a prompt doesn't re-read it.
+     */
+    @Synchronized fun forPrompt(budget: Int = 5_000): String {
+        val key = Triple(file.lastModified(), file.length(), budget)
+        if (key == cached) return cachedText
+        return buildPrompt(budget).also { cachedText = it; cached = key }
+    }
+
+    private fun buildPrompt(budget: Int): String {
         val out = mutableListOf<String>()
         var used = 0
         for (f in facts().asReversed()) {
@@ -106,7 +118,21 @@ class SkillLibrary(val dir: File) {
 
     init { dir.mkdirs() }
 
-    fun list(): List<Skill> = dir.listFiles()?.filter { File(it, "SKILL.md").isFile }?.mapNotNull { folder ->
+    private var cachedKey: List<String>? = null
+    private var cachedList: List<Skill> = emptyList()
+
+    /**
+     * Every skill's name and description. Cached until a SKILL.md is added, removed or changed
+     * (checked by path, size and modified time), so prompts don't re-read every file each message.
+     */
+    @Synchronized fun list(): List<Skill> {
+        val files = dir.listFiles()?.map { File(it, "SKILL.md") }?.filter { it.isFile }.orEmpty()
+        val key = files.map { "${it.path}|${it.length()}|${it.lastModified()}" }.sorted()
+        if (key == cachedKey) return cachedList
+        return scan().also { cachedList = it; cachedKey = key }
+    }
+
+    private fun scan(): List<Skill> = dir.listFiles()?.filter { File(it, "SKILL.md").isFile }?.mapNotNull { folder ->
         val text = File(folder, "SKILL.md").readText()
         val head = frontmatter(text)
         Skill(head["name"] ?: folder.name, head["description"] ?: text.lineSequence().firstOrNull { it.isNotBlank() && !it.startsWith("---") }.orEmpty().take(160), folder)
