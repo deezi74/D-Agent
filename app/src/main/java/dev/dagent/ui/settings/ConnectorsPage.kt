@@ -132,7 +132,7 @@ private fun PcSection(g: Graph) {
                 OutlinedButton({ copy(PC_INSTALL_WINDOWS, "Windows (PowerShell)") }) { Text("Copy Windows command") }
                 OutlinedButton({ copy(PC_INSTALL_LINUX, "Linux/Mac") }) { Text("Linux/Mac") }
             }
-            Muted("Send the command to the computer (email or a notes app), paste it into PowerShell (Windows) or a terminal (Linux, Mac), and press Enter. It prints an address and a pairing code. An old laptop with 4 GB works fine, since the AI can run somewhere else.")
+            Muted("Send the command to the computer (email or a notes app), paste it into PowerShell (Windows) or a terminal (Linux, Mac), and press Enter. It prints an address and a pairing code. It only listens on that computer until you run it once with --lan (python ~/.dagent-pc/dagent_pc.py --lan). Plain http:// only works to this phone, so a computer on your network needs an https:// address (for example Tailscale HTTPS). An old laptop with 4 GB works fine, since the AI can run somewhere else.")
             Text("2. Enter what it shows:", color = p.text, fontSize = 14.sp)
             OutlinedTextField(url, { url = it; g.connectors.pcUrl = it }, label = { Text("Address (e.g. 192.168.1.20)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(code, { code = it; g.connectors.pcCode = it }, label = { Text("Pairing code") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())

@@ -32,6 +32,12 @@ ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018 bash scripts/build-llama-server
 
 Without an Android SDK, `./gradlew :core:test` builds and tests only the agent engine.
 
+## Security
+
+- **Secrets** (API keys, pairing code, email accounts, personal details) are stored by `SecretStore`: each value is encrypted with AES-256-GCM (fresh random IV per value) under a key generated in the Android Keystore. On first launch after updating, keys from the old encrypted file and the old plain-text fallback are moved in and the old files are deleted. If the Keystore doesn't work, nothing is saved in plain text: secrets read as empty and Settings shows a warning.
+- **Plain HTTP** is only allowed to `localhost`, `127.0.0.1` and `10.0.2.2` (emulator host); see `app/src/main/res/xml/network_security_config.xml`. Android can't allow IP ranges, so a server on your home network (LM Studio, Ollama, D-Agent PC) needs HTTPS (reverse proxy or Tailscale HTTPS) or its exact address added to that file in your own build.
+- **D-Agent PC** listens on `127.0.0.1` unless started with `--lan`/`--host`, uses a 12-character pairing code from Python's `secrets`, and locks an IP out for 5 minutes after 5 wrong codes in a minute. See `pc-worker/README.md`.
+
 ## Layout
 
 ```
