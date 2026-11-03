@@ -83,6 +83,8 @@ class ForgetTool(private val memory: MemoryStore) : Tool {
 
 class RecallTool(private val memory: MemoryStore) : Tool {
     override val name = "recall"
+    /** Only reads; safe to run alongside other read-only lookups. */
+    override val readOnly = true
     override val description = "Search everything you have remembered about the person, including older facts that are not in your prompt."
     override val parameters = schema {
         title()
