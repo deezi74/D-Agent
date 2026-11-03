@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -11,7 +13,7 @@ val buildNumber = (System.getenv("DAGENT_BUILD") ?: "1").toInt()
 // Read from local.properties (dagent.githubClientId / dagent.googleClientId) or the environment
 // (DAGENT_GITHUB_CLIENT_ID / DAGENT_GOOGLE_CLIENT_ID, handy as CI secrets). Client IDs aren't
 // secrets, but none is built in: blank means "not set up", and the app says so.
-val localProps = java.util.Properties().apply {
+val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
