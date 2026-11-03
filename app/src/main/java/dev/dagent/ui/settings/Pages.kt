@@ -74,6 +74,7 @@ fun ProvidersPage(g: Graph, back: () -> Unit) {
     g.settings.providersVersion.collectAsState().value
     var editing by remember { mutableStateOf(prefs.providerId) }
     Page("AI providers", back) {
+        SecretsErrorBanner(g)
         Muted("Pick where the answers come from. Keys stay encrypted on this phone. Tap one to edit it, then Use.")
         g.settings.allProviders().forEach { cfg ->
             val active = cfg.id == prefs.providerId

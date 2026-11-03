@@ -25,6 +25,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,3 +92,16 @@ fun ToggleRow(title: String, subtitle: String, checked: Boolean, onChange: (Bool
 
 @Composable
 fun Muted(text: String) = Text(text, color = LocalPalette.current.muted, fontSize = 13.sp)
+
+/** Shown when API keys can't be stored securely (see Settings.secretsError). */
+@Composable
+fun SecretsErrorBanner(g: dev.dagent.Graph) {
+    val err = g.settings.secretsError.collectAsState().value ?: return
+    val p = LocalPalette.current
+    Text(
+        err,
+        color = p.bad,
+        fontSize = 13.sp,
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.bad.copy(alpha = 0.12f)).padding(12.dp),
+    )
+}
