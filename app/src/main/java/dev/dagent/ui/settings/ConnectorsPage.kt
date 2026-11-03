@@ -47,16 +47,19 @@ import dev.dagent.core.tools.GitHubClient
 import dev.dagent.ui.LocalPalette
 import kotlinx.coroutines.launch
 
-/** Email accounts, GitHub, Telegram bot, Termux and places, each with its own key and switches. */
+/** Status of every connector, email accounts, GitHub, Google, MCP servers, Telegram bot, Termux and places, each with its own key and switches. */
 @Composable
 fun ConnectorsPage(g: Graph, back: () -> Unit) {
     Page("Connectors", back) {
         Muted("Connect your own accounts. Keys stay encrypted on this phone, and nothing here needs a D-Agent account.")
         DetailsSection(g)
+        OverviewSection(g)
         PcSection(g)
         CallsSection(g)
         EmailSection(g)
         GitHubSection(g)
+        GoogleSection(g)
+        McpSection(g)
         TelegramSection(g)
         TermuxSection(g)
         PlacesSection(g)
@@ -250,7 +253,8 @@ private fun GitHubSection(g: Graph) {
     var status by remember { mutableStateOf("") }
     Section("GitHub")
     Card {
-        Muted("Repos, issues, pull requests, notifications and files, plus the app builder: it makes a private repo for each app and builds a ready-to-install APK. Make a classic token at github.com > Settings > Developer settings with the repo and workflow boxes ticked (a fine-grained token needs Administration, Contents and Actions).")
+        Muted("Repos, issues, pull requests, notifications and files, plus the app builder: it makes a private repo for each app and builds a ready-to-install APK. Sign in with GitHub, or make a classic token at github.com > Settings > Developer settings with the repo and workflow boxes ticked (a fine-grained token needs Administration, Contents and Actions).")
+        GitHubSignIn(g)
         OutlinedTextField(token, { token = it.trim() }, label = { Text("Personal access token") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({
