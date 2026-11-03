@@ -45,6 +45,8 @@ private val imageExt = mapOf("png" to "image/png", "jpg" to "image/jpeg", "jpeg"
 
 class FileReadTool(private val ws: Workspace, private val canSeeImages: () -> Boolean) : Tool {
     override val name = "file_read"
+    /** Only reads; safe to run alongside other read-only lookups. */
+    override val readOnly = true
     override val description = "Read a file from the workspace (${Workspace.MOUNT}). Text comes back with line numbers; images come back as pictures you can see. Use offset/limit for big files."
     override val parameters = schema {
         title()
@@ -130,6 +132,8 @@ class FileEditTool(private val ws: Workspace) : Tool {
 
 class FileListTool(private val ws: Workspace) : Tool {
     override val name = "file_list"
+    /** Only reads; safe to run alongside other read-only lookups. */
+    override val readOnly = true
     override val description = "List files and folders in the workspace."
     override val parameters = schema {
         title()

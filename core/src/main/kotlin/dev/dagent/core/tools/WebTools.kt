@@ -174,6 +174,8 @@ class WebSearch(
 
 class WebSearchTool(private val search: WebSearch) : Tool {
     override val name = "web_search"
+    /** Only reads; safe to run alongside other read-only lookups. */
+    override val readOnly = true
     override val description = "Search the live web. Use it for anything current: news, prices, scores, weather, releases, people, places. " +
         "Set news=true for the latest headlines on a topic. Then open the best pages with web_fetch before answering, and cite sources as markdown links."
     override val parameters = schema {
@@ -201,6 +203,8 @@ class WebSearchTool(private val search: WebSearch) : Tool {
 /** Downloads a page and boils it down to readable text and its main links. */
 class WebFetchTool(private val http: OkHttpClient) : Tool {
     override val name = "web_fetch"
+    /** Only reads; safe to run alongside other read-only lookups. */
+    override val readOnly = true
     override val description = "Open a web page or API URL and read it as clean text (articles, docs, JSON, plain text). Faster than the browser; use the browser tool for pages that need JavaScript, clicks or logins."
     override val parameters = schema {
         title()

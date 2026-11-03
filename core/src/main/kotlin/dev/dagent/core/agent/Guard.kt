@@ -93,8 +93,8 @@ class Guard(
     /** The latest thing the person asked for, so the reviewer can compare. */
     var request: String = ""
 
-    suspend fun before(call: ToolCall, args: JsonObject, title: String, ctx: ToolContext): Before {
-        val risk = risk(call.name, args)
+    suspend fun before(call: ToolCall, args: JsonObject, title: String, ctx: ToolContext, declared: Risk? = null): Before {
+        val risk = risk(call.name, args, declared)
         val rule = rules()[call.name] ?: GuardRule.AUTO
         val detail = describe(args)
         if (rule == GuardRule.BLOCK) {
@@ -125,21 +125,21 @@ class Guard(
     }
 
     /** Cleans the output and logs the step. */
-    fun after(call: ToolCall, args: JsonObject, title: String, sessionId: String, verdict: String, result: ToolResult, millis: Long): ToolResult {
+    fun after(call: ToolCall, args: JsonObject, title: String, sessionId: String, verdict: String, result: ToolResult, millis: Long, declared: Risk? = null): ToolResult {
         var text = scrub(result.text)
-        if (call.name == "email" && filterMail) text = MailFilter.redact(text)
-        if (call.name in UNTRUSTED && Injection.suspicious(text)) text = Injection.WARNING + "\n\n" + text
+        if ((call.name == "email" || call.name == "google") && filterMail) text = MailFilter.redact(text)
+        if (untrusted(call.name) && Injection.suspicious(text)) text = Injection.WARNING + "\n\n" + text
         val out = if (text == result.text) result else result.copy(text = text)
-        log(call, args, title, sessionId, verdict, !result.isError, out.text, millis)
+        log(call, args, title, sessionId, verdict, !result.isError, out.text, millis, declared)
         return out
     }
 
-    fun log(call: ToolCall, args: JsonObject, title: String, sessionId: String, verdict: String, ok: Boolean, result: String, millis: Long) {
+    fun log(call: ToolCall, args: JsonObject, title: String, sessionId: String, verdict: String, ok: Boolean, result: String, millis: Long, declared: Risk? = null) {
         val sink = sink ?: return
         runCatching {
             sink.record(ActivityEntry(
                 time = System.currentTimeMillis(), sessionId = sessionId, tool = call.name, title = title,
-                detail = scrub(describe(args)), risk = risk(call.name, args), verdict = verdict, ok = ok,
+                detail = scrub(describe(args)), risk = risk(call.name, args, declared), verdict = verdict, ok = ok,
                 result = scrub(result).replace(Regex("\\s+"), " ").take(300), millis = millis,
             ))
         }
@@ -186,7 +186,10 @@ class Guard(
         val PLACEHOLDER = Regex("\\{\\{\\s*vault:([^\\}]+)\\}\\}")
 
         /** Tools whose output comes from strangers: web pages, search results, mail, code. */
-        val UNTRUSTED = setOf("web_fetch", "web_search", "browser", "email", "github")
+        val UNTRUSTED = setOf("web_fetch", "web_search", "browser", "email", "github", "google")
+
+        /** Connector tools from MCP servers answer with whatever the server (and its data) says. */
+        fun untrusted(tool: String) = tool in UNTRUSTED || tool.startsWith("mcp_")
 
         private val READ_ACTIONS = setOf(
             "read", "inbox", "search", "folders", "status", "list", "files", "elements", "screenshot", "scroll", "back",
@@ -196,8 +199,9 @@ class Guard(
         )
 
         /** Sorts a step by what it could affect. */
-        fun risk(tool: String, args: JsonObject): Risk {
+        fun risk(tool: String, args: JsonObject, declared: Risk? = null): Risk {
             val action = (args["action"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+            if (declared != null) return declared
             return when (tool) {
                 "web_search", "web_fetch", "recall", "weather", "places", "file_read", "file_list", "plan" -> Risk.READ
                 "browser" -> when (action) {
@@ -212,6 +216,14 @@ class Guard(
                     else -> Risk.LOCAL
                 }
                 "github" -> if (action == "create_issue" || action == "comment") Risk.OUTWARD else Risk.READ
+                "google" -> if (action in GOOGLE_WRITES) Risk.OUTWARD else Risk.READ
+                // An MCP tool that didn't declare itself: treat as reaching outside the phone.
+                else -> if (tool.startsWith("mcp_")) Risk.OUTWARD else risk2(tool, action)
+            }
+        }
+
+        private fun risk2(tool: String, action: String): Risk {
+            return when (tool) {
                 "email" -> if (action in READ_ACTIONS || action.isBlank()) Risk.READ else Risk.LOCAL
                 "app_builder" -> if (action in READ_ACTIONS || action == "apk") Risk.READ else Risk.LOCAL
                 "pc" -> if (action in setOf("status", "task", "tasks", "wait", "get_file")) Risk.READ else Risk.LOCAL
@@ -219,6 +231,9 @@ class Guard(
                 else -> Risk.LOCAL
             }
         }
+
+        /** Actions of the google tool that change the person's account. */
+        val GOOGLE_WRITES = setOf("calendar_create", "gmail_draft")
 
         /** Short, readable argument list without the title. */
         fun describe(args: JsonObject): String =

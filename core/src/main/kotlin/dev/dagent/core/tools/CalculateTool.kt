@@ -22,6 +22,8 @@ import kotlin.math.sqrt
  */
 class CalculateTool : Tool {
     override val name = "calculate"
+    /** Only reads; safe to run alongside other read-only lookups. */
+    override val readOnly = true
     override val description = "Work out math exactly instead of doing it in your head: prices, tips, tax, percentages, unit math, " +
         "loan payments. Example expressions: 19.99*3*1.07, 15% of 84, (1+0.05/12)^(12*5), sqrt(2)."
     override val parameters = schema {

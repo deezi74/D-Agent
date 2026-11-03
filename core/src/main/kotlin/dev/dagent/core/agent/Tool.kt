@@ -45,6 +45,19 @@ interface Tool {
     val parameters: JsonObject
     suspend fun run(args: Args, ctx: ToolContext): ToolResult
 
+    /**
+     * True only for tools that never change anything (no writes, no messages, no purchases) and
+     * are safe to run at the same time as other read-only tools. [AgentLoop] runs a batch of such
+     * calls in parallel; everything else runs one at a time.
+     */
+    val readOnly: Boolean get() = false
+
+    /**
+     * How risky the tool is when [Guard.risk] doesn't know it by name (MCP and other connector
+     * tools). Null: the guard decides by name as before.
+     */
+    val declaredRisk: Risk? get() = null
+
     fun spec() = ToolSpec(name, description, parameters)
 }
 

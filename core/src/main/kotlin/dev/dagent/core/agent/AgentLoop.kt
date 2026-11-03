@@ -8,6 +8,9 @@ import dev.dagent.core.llm.Msg
 import dev.dagent.core.llm.Role
 import dev.dagent.core.llm.ToolCall
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -45,7 +48,7 @@ sealed interface AgentEvent {
 
 /**
  * The reason, act, observe loop. Each step streams one model reply; if it asks for tools they
- * run one after another, their results go back in, and the loop goes on until the model answers
+ * run (read-only lookups side by side, everything else one after another), their results go back in in order, and the loop goes on until the model answers
  * without calling anything, the step limit is hit, or the collector cancels.
  */
 class AgentLoop(
@@ -93,11 +96,12 @@ class AgentLoop(
             emit(AgentEvent.Message(reply))
             if (reply.toolCalls.isEmpty()) break
 
-            for (call in reply.toolCalls) {
-                val result = runTool(call, ctx, seen)
-                val msg = Msg.tool(call, clip(result.text), result.images)
-                transcript += msg
-                emit(AgentEvent.Message(msg))
+            for (batch in batches(reply.toolCalls)) {
+                for ((call, result) in runBatch(batch, ctx, seen)) {
+                    val msg = Msg.tool(call, clip(result.text), result.images)
+                    transcript += msg
+                    emit(AgentEvent.Message(msg))
+                }
             }
         }
     }
@@ -183,43 +187,96 @@ class AgentLoop(
         return Msg.assistant(finalText.trim(), calls, reasoning.toString())
     }
 
-    private suspend fun FlowCollector<AgentEvent>.runTool(call: ToolCall, ctx: ToolContext, seen: HashMap<String, Int>): ToolResult {
+    /**
+     * Splits one reply's calls into batches that keep the model's order: a run of consecutive
+     * read-only calls (see [Tool.readOnly]) forms one batch that may run in parallel; every other
+     * call is a batch of its own.
+     */
+    internal fun batches(calls: List<ToolCall>): List<List<ToolCall>> {
+        val out = mutableListOf<MutableList<ToolCall>>()
+        var openRead = false
+        for (call in calls) {
+            val read = byName[call.name]?.readOnly == true
+            if (read && openRead) out.last() += call
+            else out += mutableListOf(call)
+            openRead = read
+        }
+        return out
+    }
+
+    /** One call after its checks: either an answer already, or allowed to run with these arguments. */
+    private class Prepared(
+        val call: ToolCall,
+        val tool: Tool?,
+        val parsed: JsonObject?,
+        val title: String,
+        val start: Long,
+        var result: ToolResult? = null,
+        var allowed: Guard.Before.Allowed? = null,
+        var millis: Long = 0,
+    )
+
+    /**
+     * Runs a batch. Checks (guard, repeat limit) and every event happen one call at a time in
+     * the model's order; only the tool bodies of a read-only batch run at the same time. The
+     * results come back in the same order as the calls.
+     */
+    private suspend fun FlowCollector<AgentEvent>.runBatch(batch: List<ToolCall>, ctx: ToolContext, seen: HashMap<String, Int>): List<Pair<ToolCall, ToolResult>> {
+        val prepared = batch.map { prepare(it, ctx, seen) }
+        val toRun = prepared.filter { it.allowed != null }
+        if (toRun.size > 1) {
+            val results = coroutineScope { toRun.map { p -> async { execute(p, ctx) } }.awaitAll() }
+            toRun.forEachIndexed { i, p -> p.result = results[i] }
+        } else {
+            toRun.forEach { it.result = execute(it, ctx) }
+        }
+        return prepared.map { p ->
+            val allowed = p.allowed
+            // The guard cleans and logs results in call order, never from two threads at once.
+            var result = if (allowed == null) p.result!!
+                else guard?.after(p.call, p.parsed!!, p.title, ctx.sessionId, allowed.verdict, p.result!!, p.millis, p.tool?.declaredRisk) ?: p.result!!
+            emit(AgentEvent.ToolEnd(p.call, result, System.currentTimeMillis() - p.start))
+            if (result.isError && !result.text.startsWith("Error")) result = result.copy(text = "Error: ${result.text}")
+            p.call to result
+        }
+    }
+
+    private suspend fun FlowCollector<AgentEvent>.prepare(call: ToolCall, ctx: ToolContext, seen: HashMap<String, Int>): Prepared {
         val tool = byName[call.name]
         val parsed: JsonObject? = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(call.arguments.ifBlank { "{}" }).jsonObject }.getOrNull()
         val title = (parsed?.get("title") as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: defaultTitle(call.name)
         emit(AgentEvent.ToolStart(call, title))
-        val start = System.currentTimeMillis()
+        val p = Prepared(call, tool, parsed, title, System.currentTimeMillis())
         val key = call.name + "\u0000" + (parsed?.let { JsonObject(it - "title").toString() } ?: call.arguments)
         val count = (seen[key] ?: 0) + 1
         seen[key] = count
-        val result = when {
-            tool == null -> ToolResult.error("There is no tool named \"${call.name}\". Available: ${byName.keys.joinToString()}.")
-            parsed == null -> ToolResult.error("The arguments were not valid JSON: ${call.arguments.take(300)}. Call the tool again with a JSON object.")
-            count > options.repeatLimit -> ToolResult.error("You already made this exact call ${count - 1} times and got the same result. Try a different approach or tell the person what is blocking you.")
-            else -> {
-                val check = guard?.before(call, parsed, title, ctx) ?: Guard.Before.Allowed(parsed, "ran")
-                when (check) {
-                    is Guard.Before.Denied -> {
-                        guard?.log(call, parsed, title, ctx.sessionId, check.verdict, false, check.message, 0)
-                        ToolResult.error(check.message)
-                    }
-                    is Guard.Before.Allowed -> {
-                        val raw = try {
-                            tool.run(Args(check.args), ctx)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: IllegalArgumentException) {
-                            ToolResult.error("Bad arguments: ${e.message}")
-                        } catch (e: Throwable) {
-                            ToolResult.error("${e::class.simpleName}: ${e.message}")
-                        }
-                        guard?.after(call, parsed, title, ctx.sessionId, check.verdict, raw, System.currentTimeMillis() - start) ?: raw
-                    }
+        when {
+            tool == null -> p.result = ToolResult.error("There is no tool named \"${call.name}\". Available: ${byName.keys.joinToString()}.")
+            parsed == null -> p.result = ToolResult.error("The arguments were not valid JSON: ${call.arguments.take(300)}. Call the tool again with a JSON object.")
+            count > options.repeatLimit -> p.result = ToolResult.error("You already made this exact call ${count - 1} times and got the same result. Try a different approach or tell the person what is blocking you.")
+            else -> when (val check = guard?.before(call, parsed, title, ctx, tool.declaredRisk) ?: Guard.Before.Allowed(parsed, "ran")) {
+                is Guard.Before.Denied -> {
+                    guard?.log(call, parsed, title, ctx.sessionId, check.verdict, false, check.message, 0, tool.declaredRisk)
+                    p.result = ToolResult.error(check.message)
                 }
+                is Guard.Before.Allowed -> p.allowed = check
             }
         }
-        emit(AgentEvent.ToolEnd(call, result, System.currentTimeMillis() - start))
-        return if (result.isError && !result.text.startsWith("Error")) result.copy(text = "Error: ${result.text}") else result
+        return p
+    }
+
+    private suspend fun execute(p: Prepared, ctx: ToolContext): ToolResult {
+        val check = p.allowed!!
+        val tool = p.tool!!
+        return try {
+            tool.run(Args(check.args), ctx)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IllegalArgumentException) {
+            ToolResult.error("Bad arguments: ${e.message}")
+        } catch (e: Throwable) {
+            ToolResult.error("${e::class.simpleName}: ${e.message}")
+        }.also { p.millis = System.currentTimeMillis() - p.start }
     }
 
     private fun defaultTitle(name: String) = name.replace('_', ' ').replaceFirstChar { it.uppercase() }
