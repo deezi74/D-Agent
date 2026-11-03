@@ -127,7 +127,7 @@ class Guard(
     /** Cleans the output and logs the step. */
     fun after(call: ToolCall, args: JsonObject, title: String, sessionId: String, verdict: String, result: ToolResult, millis: Long, declared: Risk? = null): ToolResult {
         var text = scrub(result.text)
-        if (call.name == "email" && filterMail) text = MailFilter.redact(text)
+        if ((call.name == "email" || call.name == "google") && filterMail) text = MailFilter.redact(text)
         if (untrusted(call.name) && Injection.suspicious(text)) text = Injection.WARNING + "\n\n" + text
         val out = if (text == result.text) result else result.copy(text = text)
         log(call, args, title, sessionId, verdict, !result.isError, out.text, millis, declared)
