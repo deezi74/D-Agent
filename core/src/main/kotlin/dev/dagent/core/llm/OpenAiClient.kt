@@ -37,7 +37,7 @@ class OpenAiClient(
     private val extraHeaders: Map<String, String> = emptyMap(),
     private val reasoning: ReasoningStyle = ReasoningStyle.NONE,
 ) : LlmClient {
-    private val base = baseUrl.trimEnd('/')
+    private val base = withApiPath(baseUrl.trim().trimEnd('/'))
     /** The phone's own llama.cpp server: it can report how far it is through reading the prompt. */
     private val llamaServer = base.contains("127.0.0.1:${Providers.LOCAL_PORT}")
     /** llama.cpp or LM Studio on this phone or the home network: takes the extra sampling knobs. */
@@ -250,3 +250,9 @@ class OpenAiClient(
 internal val Json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; isLenient = true }
 
 internal fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+
+/** "http://192.168.1.113:1234" means ".../v1": servers like LM Studio and Ollama only answer there. */
+fun withApiPath(base: String): String {
+    val afterScheme = base.substringAfter("://", base)
+    return if (afterScheme.isNotEmpty() && '/' !in afterScheme) "$base/v1" else base
+}

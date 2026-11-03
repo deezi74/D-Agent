@@ -23,3 +23,11 @@ class ReverseToolTest {
         assertTrue(ReverseTool.command("strings", p, "password", 50)!!.contains("grep -i -F -- 'password'"))
     }
 }
+
+class ApiPathTest {
+    @Test fun addsV1WhenThereIsNoPath() {
+        assertEquals("http://192.168.1.113:1234/v1", dev.dagent.core.llm.withApiPath("http://192.168.1.113:1234"))
+        assertEquals("http://localhost:3001/v1", dev.dagent.core.llm.withApiPath("http://localhost:3001/v1"))
+        assertEquals("https://api.groq.com/openai/v1", dev.dagent.core.llm.withApiPath("https://api.groq.com/openai/v1"))
+    }
+}
