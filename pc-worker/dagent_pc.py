@@ -13,6 +13,7 @@ Only Python's standard library is used, so there is nothing else to install.
     python dagent_pc.py            start the server (prints the pairing code)
     python dagent_pc.py --code     show the pairing code and addresses
     python dagent_pc.py --new-code make a new pairing code (the phone must be paired again)
+    python dagent_pc.py --lan      listen on the home network (default: this device only, 127.0.0.1)
     python dagent_pc.py --task "..."   run one task here in the console (for testing)
 """
 from __future__ import annotations
@@ -55,8 +56,9 @@ DEFAULT_CONFIG = {
     "workspace": str(Path.home() / "D-Agent"),
     "allow_shell": True,
     "max_steps": 40,
-    # On a phone only D-Agent on the same phone may connect; a PC listens on the home network.
-    "bind": "127.0.0.1" if IS_TERMUX else "0.0.0.0",
+    # Only apps on this device may connect by default. Start with --lan (or --host 0.0.0.0)
+    # to let a phone on the home network reach this PC.
+    "bind": "127.0.0.1",
     "llm": {
         # LM Studio's server on a PC; FreeLLMAPI on a phone. For Ollama use http://localhost:11434/v1.
         "base_url": "http://localhost:3001/v1" if IS_TERMUX else "http://localhost:1234/v1",
@@ -67,6 +69,45 @@ DEFAULT_CONFIG = {
 }
 
 _lock = threading.Lock()
+
+# Wrong pairing codes per client IP: after MAX_FAILS within FAIL_WINDOW seconds the IP is
+# locked out for LOCKOUT seconds (answers 429 without checking the code).
+MAX_FAILS = 5
+FAIL_WINDOW = 60.0
+LOCKOUT = 300.0
+
+
+class AuthThrottle:
+    def __init__(self, max_fails: int = MAX_FAILS, window: float = FAIL_WINDOW, lockout: float = LOCKOUT, clock=time.monotonic):
+        self.max_fails, self.window, self.lockout, self.clock = max_fails, window, lockout, clock
+        self._fails: dict[str, list[float]] = {}
+        self._locked: dict[str, float] = {}
+        self._mu = threading.Lock()
+
+    def locked_for(self, ip: str) -> float:
+        """Seconds left on this IP's lockout (0 when it may try)."""
+        with self._mu:
+            until = self._locked.get(ip, 0.0)
+            left = until - self.clock()
+            if left <= 0:
+                self._locked.pop(ip, None)
+                return 0.0
+            return left
+
+    def fail(self, ip: str) -> None:
+        with self._mu:
+            now = self.clock()
+            recent = [t for t in self._fails.get(ip, []) if now - t < self.window] + [now]
+            if len(recent) >= self.max_fails:
+                self._locked[ip] = now + self.lockout
+                self._fails.pop(ip, None)
+                log(f"too many wrong pairing codes from {ip}; locked out for {int(self.lockout)}s")
+            else:
+                self._fails[ip] = recent
+
+    def success(self, ip: str) -> None:
+        with self._mu:
+            self._fails.pop(ip, None)
 
 
 def log(msg: str) -> None:
@@ -730,6 +771,7 @@ def text_tool_manual(tools: list) -> str:
 class Api(BaseHTTPRequestHandler):
     server_version = f"DAgentPC/{VERSION}"
     worker: Worker  # set at startup
+    throttle = AuthThrottle()
 
     def log_message(self, fmt, *args):  # quiet; errors go to our log
         pass
@@ -743,11 +785,17 @@ class Api(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _authed(self) -> bool:
+        ip = self.client_address[0]
+        left = self.throttle.locked_for(ip)
+        if left > 0:
+            self._send(429, {"error": f"Too many wrong pairing codes. Try again in {int(left) + 1} seconds."})
+            return False
         want = self.worker.cfg["token"]
         got = self.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-        if got and secrets.compare_digest(got.upper(), want.upper()):
+        if got and secrets.compare_digest(got.upper().encode(), want.upper().encode()):
+            self.throttle.success(ip)
             return True
-        time.sleep(0.5)  # slows down guessing
+        self.throttle.fail(ip)
         self._send(401, {"error": "Wrong or missing pairing code. Check it with: python dagent_pc.py --code"})
         return False
 
@@ -858,8 +906,10 @@ def show_code(cfg: dict) -> None:
     print("  D-Agent PC is ready")
     print("  -------------------")
     print(f"  Pairing code:  {cfg['token']}")
-    if cfg.get("bind", "0.0.0.0").startswith("127."):
+    if cfg.get("bind", "127.0.0.1").startswith("127.") or cfg.get("bind") == "localhost":
         print(f"  Address:       http://127.0.0.1:{port}  (only apps on this device)")
+        if not IS_TERMUX:
+            print("  To pair a phone on your home network, start with:  python dagent_pc.py --lan")
     else:
         for a in local_addresses() or ["<this PC's IP>"]:
             print(f"  Address:       http://{a}:{port}")
@@ -877,15 +927,20 @@ def main() -> None:
     ap.add_argument("--task", help="run one task in this console and print the result")
     ap.add_argument("--port", type=int, help="port to listen on (default 8787)")
     ap.add_argument("--token", action="store_true", help="print only the pairing code (used by the D-Agent app)")
-    ap.add_argument("--bind", help="address to listen on: 0.0.0.0 (home network) or 127.0.0.1 (this device only)")
+    ap.add_argument("--host", "--bind", dest="host",
+                    help="address to listen on (default 127.0.0.1, this device only); saved for next time")
+    ap.add_argument("--lan", action="store_true",
+                    help="listen on the home network (same as --host 0.0.0.0); saved for next time")
     args = ap.parse_args()
 
     cfg = load_config()
     if args.port:
         cfg["port"] = args.port
         save_config(cfg)
-    if args.bind:
-        cfg["bind"] = args.bind
+    if args.lan and not args.host:
+        args.host = "0.0.0.0"
+    if args.host:
+        cfg["bind"] = args.host
         save_config(cfg)
     if args.token:
         print(cfg["token"])
@@ -910,7 +965,7 @@ def main() -> None:
 
     Api.worker = Worker(cfg)
     try:
-        httpd = ThreadingHTTPServer((cfg.get("bind") or "0.0.0.0", int(cfg["port"])), Api)
+        httpd = ThreadingHTTPServer((cfg.get("bind") or "127.0.0.1", int(cfg["port"])), Api)
     except OSError as e:
         log(f"Port {cfg['port']} is busy ({e}). Is D-Agent PC already running?")
         sys.exit(1)

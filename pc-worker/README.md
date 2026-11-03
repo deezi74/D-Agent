@@ -25,6 +25,8 @@ curl -fsSL https://raw.githubusercontent.com/deezi74/D-Agent/claude/project-thre
 
 When it finishes, it prints a **pairing code** and the **address**. In D-Agent, go to Settings > Connectors > Your PC, enter both, and tap Test.
 
+D-Agent PC listens only on `127.0.0.1` (this computer) by default. To let your phone reach it over the home network or Tailscale, run `python ~/.dagent-pc/dagent_pc.py --lan` once (the choice is saved in `config.json`, key `bind`) and restart it. Use `--host <address>` to listen on one specific address instead. Note: the D-Agent app only sends plain `http://` to `localhost`, `127.0.0.1` and `10.0.2.2` unless the PC's address is added to the app's network security config, so for a PC on your network prefer an HTTPS reverse proxy or Tailscale HTTPS (see the main README, "Plain HTTP").
+
 ## The AI model
 
 D-Agent PC uses `http://localhost:1234/v1` by default, which is LM Studio's server.
@@ -50,12 +52,16 @@ You can change these from the phone (Settings > Connectors > Your PC), or by edi
 python dagent_pc.py              # run the server
 python dagent_pc.py --code       # show the pairing code and addresses
 python dagent_pc.py --new-code   # new pairing code (pair the phone again)
+python dagent_pc.py --lan        # listen on the home network (saved; default is 127.0.0.1 only)
+python dagent_pc.py --host ADDR  # listen on one address (saved); --bind is the old name
 python dagent_pc.py --task "..." # run one task in the console
 ```
 
 ## Safety
 
-- Every request needs the pairing code.
+- Every request needs the pairing code (12 characters, `XXXX-XXXX-XXXX`, from Python's `secrets`).
+- After 5 wrong codes within a minute, that IP address is locked out for 5 minutes (HTTP 429).
+- It listens only on this computer unless you start it with `--lan` or `--host`.
 - Files can only be read and written inside the workspace.
 - Commands that could wipe or break the computer are refused, such as `format`, `diskpart`, `rm -rf /` and `shutdown`.
 - Tasks are told never to buy, send messages, post, or sign in to accounts.
