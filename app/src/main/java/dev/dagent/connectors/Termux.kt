@@ -86,6 +86,9 @@ class TermuxBridge(private val context: Context) {
         } ?: Result("", "", null, "no answer from Termux within ${timeoutMs / 1000}s. For long work use action \"start\" (runs in the background).")
     }
 
+    /** True when Termux actually runs a command for us (it silently drops them when allow-external-apps is off). */
+    suspend fun answers(): Boolean = run("echo DAGENT_OK", 15_000).stdout.contains("DAGENT_OK")
+
     /** Termux from the Play Store is years old and ignores commands from other apps. */
     fun isOutdated(): Boolean = runCatching {
         val info = context.packageManager.getPackageInfo(TERMUX, 0)
@@ -205,6 +208,12 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
             termux.pasteFallback(FREELLMAPI_START)
             return ToolResult.ok("$problem\nFor now I copied the start command and opened Termux: the person just long-presses, pastes and presses Enter. Tell them that.")
         }
+        // Termux drops commands silently when allow-external-apps is off, so check it answers first.
+        ctx.progress("Checking Termux...")
+        if (!termux.answers()) {
+            termux.pasteFallback(FREELLMAPI_START)
+            return ToolResult.ok(NOT_ANSWERING + " For now I copied the start command and opened Termux: long-press, Paste, Enter.")
+        }
         ctx.progress("Starting FreeLLMAPI in Termux...")
         termux.openSession(FREELLMAPI_SCRIPT, "FreeLLMAPI")?.let { err ->
             termux.pasteFallback(FREELLMAPI_START)
@@ -231,6 +240,7 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
         val port = dev.dagent.phone.CloudVoice.TERMUX_PORT
         if (termux.portOpen(port)) return ToolResult.ok("The free voice is already running. Pick it in Settings > Voice.")
         termux.problem()?.let { return ToolResult.error(it + SETUP_HINT) }
+        if (!termux.answers()) return ToolResult.error(NOT_ANSWERING)
         ctx.progress("Setting up the free voice in Termux...")
         val b64 = Base64.encodeToString(VOICE_SERVER_PY.toByteArray(), Base64.NO_WRAP)
         val script = "mkdir -p ~/.dagent/voice && echo '$b64' | base64 -d > ~/.dagent/voice/server.py && " +
@@ -300,6 +310,9 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
         private const val MAX = 6000
 
         const val FREELLMAPI_START = TermuxBridge.FREELLMAPI_COMMAND
+        const val NOT_ANSWERING = "Termux isn't accepting commands from D-Agent right now (it ignores them without saying why). " +
+            "Fix: open Termux and run  echo allow-external-apps=true >> ~/.termux/termux.properties ; termux-reload-settings  " +
+            "(if that says Permission denied, first run  chmod u+w ~/.termux/termux.properties ), then close Termux and try again."
         const val SETUP_HINT = ". One-time Termux setup: in Termux run  echo allow-external-apps=true >> ~/.termux/termux.properties && termux-reload-settings  then allow D-Agent in Settings > Connectors > Termux"
 
         /** A tiny OpenAI-style speech server: POST /v1/audio/speech {input, voice} returns MP3. */
