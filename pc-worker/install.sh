@@ -37,6 +37,8 @@ curl -fsSL "$RAW/dagent_pc.py" -o "$SCRIPT.new"
 "$PY" -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$SCRIPT.new"
 mv -f "$SCRIPT.new" "$SCRIPT"
 pkill -f "python[0-9.]* [^ ]*dagent_pc[.]py" 2>/dev/null || true
+# A computer listens on the home network so the phone can pair; on a phone it stays private.
+[ "$TERMUX" = 1 ] || "$PY" "$SCRIPT" --lan --token >/dev/null
 
 if [ "$TERMUX" = 1 ]; then
   say "Setting up D-Agent PC on this phone..."

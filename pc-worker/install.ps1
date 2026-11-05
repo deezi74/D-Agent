@@ -63,6 +63,8 @@ Get-CimInstance Win32_Process -Filter "Name like 'python%'" -ErrorAction Silentl
     Where-Object { $_.CommandLine -like '*dagent_pc.py*' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
+& $Python $Script --lan --token | Out-Null   # listen on the home network so the phone can pair
+
 Say 'Starting D-Agent PC with Windows...'
 $Startup = [Environment]::GetFolderPath('Startup')
 $Shell = New-Object -ComObject WScript.Shell

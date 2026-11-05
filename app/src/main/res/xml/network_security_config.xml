@@ -1,24 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Plain HTTP is only allowed to servers on this phone (and the emulator's host, 10.0.2.2):
-  the on-phone model server, FreeLLMAPI / Ollama / the voice server in Termux, D-Agent PC in Termux.
-  Everything else must use HTTPS.
-
-  Android can't express IP ranges here, so servers on the home network (LM Studio, Ollama or
-  D-Agent PC on another computer at e.g. 192.168.1.20) need either HTTPS (a reverse proxy, or
-  Tailscale's HTTPS names) or an explicit entry below for their exact address, for example:
-      <domain includeSubdomains="false">192.168.1.20</domain>
-  Plain HTTP on a shared network lets anyone on it read API keys and pairing codes.
+  Plain HTTP is allowed so D-Agent can reach servers on your own home network
+  (LM Studio or Ollama on a PC, D-Agent PC on :8787, FreeLLMAPI in Termux).
+  Cloud providers all use HTTPS anyway. On a shared or public Wi-Fi, prefer HTTPS
+  (for example Tailscale HTTPS names), since plain HTTP can be read by others on it.
 -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">localhost</domain>
-        <domain includeSubdomains="false">127.0.0.1</domain>
-        <domain includeSubdomains="false">10.0.2.2</domain>
-    </domain-config>
 </network-security-config>
