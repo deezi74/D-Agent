@@ -295,7 +295,7 @@ class ConnectorHub(private val g: Graph) {
             },
             status = { if (g.connectors.pcUrl.isNotBlank() && g.connectors.pcCode.isNotBlank()) ConnectorStatus.CONNECTED else ConnectorStatus.needsSignIn() }))
         registry.register(Connector("ai_call", "AI phone calls", AuthType.API_KEY,
-            provider = ToolProvider.of { listOf(AiCallTool(AiCallClient({ g.connectors.aiCallKey }, http = g.http)) { g.connectors.ownerName() }) },
+            provider = ToolProvider.of { listOf(AiCallTool(AiCallClient({ g.connectors.aiCallKey }, http = g.http), g.connectors.aiCallBudget) { g.connectors.ownerName() }) },
             status = { if (g.connectors.aiCallKey.isNotBlank()) ConnectorStatus.CONNECTED else ConnectorStatus.needsSignIn() }))
         servers().forEach(::registerMcp)
     }

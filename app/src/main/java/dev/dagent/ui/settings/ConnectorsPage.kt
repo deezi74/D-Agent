@@ -188,6 +188,14 @@ private fun CallsSection(g: Graph) {
         Muted("Let ${g.settings.current.persona.name} call a place and talk for you (\"call Waffle House and ask if they have eggs\"), then tell you what they said. Android doesn't let apps speak into a normal SIM call, so the call goes out from Bland AI's line using your own key. Calls cost about 9 cents a minute on their side. It always says it's an AI assistant and asks you before every call.")
         OutlinedTextField(key, { key = it.trim(); g.connectors.aiCallKey = key }, label = { Text("Bland AI API key") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://app.bland.ai"))) }) { Text("Get a key") }
+        var cap by remember { mutableStateOf(g.connectors.aiCallCap.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }) }
+        OutlinedTextField(cap, { v ->
+            cap = v.filter { it.isDigit() || it == '.' }.take(7)
+            cap.toDoubleOrNull()?.let { g.connectors.aiCallCap = it }
+        }, label = { Text("Monthly limit in dollars (0 = no limit)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        val b = g.connectors.aiCallBudget
+        Muted(if (b.cap() > 0) "This month: ${dev.dagent.core.tools.CallBudget.money(b.used())} of ${dev.dagent.core.tools.CallBudget.money(b.cap())} used. Each call is shortened to fit what's left, and calls stop when it runs out. It resets on the 1st."
+            else "No monthly limit is set, so calls can cost as much as your Bland balance allows.")
     }
 }
 

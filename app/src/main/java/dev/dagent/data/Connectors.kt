@@ -50,6 +50,18 @@ class Connectors(context: Context, private val settings: Settings) {
         get() = settings.secret("ai_call")
         set(v) = settings.setSecret("ai_call", v)
 
+    /** Most the AI calls may spend each month, in dollars (0 = no limit). */
+    var aiCallCap: Double
+        get() = prefs.getFloat("ai_call.cap", dev.dagent.core.tools.CallBudget.DEFAULT_CAP.toFloat()).toDouble()
+        set(v) { prefs.edit().putFloat("ai_call.cap", v.coerceAtLeast(0.0).toFloat()).apply() }
+
+    /** What the AI calls spent this month (see CallBudget). */
+    val aiCallBudget = dev.dagent.core.tools.CallBudget(
+        load = { prefs.getString("ai_call.spend", "")!! },
+        save = { prefs.edit().putString("ai_call.spend", it).commit() },
+        limit = { aiCallCap },
+    )
+
     /** The person's own details for checkout forms and for saying who a call is for. */
     var myName: String
         get() = settings.secret("me.name")
