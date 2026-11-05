@@ -210,6 +210,7 @@ class Guard(
                     else -> Risk.LOCAL
                 }
                 "ai_call" -> if (action == "call") Risk.OUTWARD else Risk.READ
+                "manus" -> if (action == "status") Risk.READ else Risk.OUTWARD
                 "phone" -> when (action) {
                     "call", "sms_send" -> Risk.OUTWARD
                     in READ_ACTIONS -> Risk.READ

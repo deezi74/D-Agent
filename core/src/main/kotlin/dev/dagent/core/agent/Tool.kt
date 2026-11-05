@@ -167,6 +167,6 @@ class SlimTool(private val inner: Tool) : Tool by inner {
 
         /** Tools worth their prompt space on a phone-sized model. */
         val PHONE_CHAT = setOf("web_search", "web_fetch", "weather", "places", "phone", "remember", "recall", "make_image", "make_website", "calculate")
-        val PHONE_AGENT = PHONE_CHAT + setOf("shell", "browser", "file_read", "file_write", "file_list", "schedule", "termux", "ai_call", "reverse")
+        val PHONE_AGENT = PHONE_CHAT + setOf("shell", "browser", "file_read", "file_write", "file_list", "schedule", "termux", "ai_call", "manus", "reverse")
     }
 }

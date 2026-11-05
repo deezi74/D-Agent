@@ -297,8 +297,15 @@ class ConnectorHub(private val g: Graph) {
         registry.register(Connector("ai_call", "AI phone calls", AuthType.API_KEY,
             provider = ToolProvider.of { listOf(AiCallTool(AiCallClient({ g.connectors.aiCallKey }, http = g.http), g.connectors.aiCallBudget) { g.connectors.ownerName() }) },
             status = { if (g.connectors.aiCallKey.isNotBlank()) ConnectorStatus.CONNECTED else ConnectorStatus.needsSignIn() }))
+        registry.register(Connector("manus", "Manus agent", AuthType.API_KEY,
+            provider = ToolProvider.of {
+                listOf(dev.dagent.core.tools.ManusTool(manusClient(), { g.connectors.manusAgent }, g.connectors.manusCalls) { g.connectors.ownerName() })
+            },
+            status = { if (g.connectors.manusKey.isNotBlank()) ConnectorStatus.CONNECTED else ConnectorStatus.needsSignIn() }))
         servers().forEach(::registerMcp)
     }
+
+    fun manusClient() = dev.dagent.core.tools.ManusClient({ g.connectors.manusKey }, http = g.http)
 
     private fun hasGoogleWriteScopes(): Boolean {
         val granted = tokenStore.load(GOOGLE)?.scope.orEmpty()

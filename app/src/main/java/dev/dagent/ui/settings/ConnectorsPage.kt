@@ -56,6 +56,7 @@ fun ConnectorsPage(g: Graph, back: () -> Unit) {
         OverviewSection(g)
         PcSection(g)
         CallsSection(g)
+        ManusSection(g)
         EmailSection(g)
         GitHubSection(g)
         GoogleSection(g)
@@ -196,6 +197,49 @@ private fun CallsSection(g: Graph) {
         val b = g.connectors.aiCallBudget
         Muted(if (b.cap() > 0) "This month: ${dev.dagent.core.tools.CallBudget.money(b.used())} of ${dev.dagent.core.tools.CallBudget.money(b.cap())} used. Each call is shortened to fit what's left, and calls stop when it runs out. It resets on the 1st."
             else "No monthly limit is set, so calls can cost as much as your Bland balance allows.")
+    }
+}
+
+@Composable
+private fun ManusSection(g: Graph) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var key by remember { mutableStateOf(g.connectors.manusKey) }
+    var agentName by remember { mutableStateOf(g.connectors.manusAgentName) }
+    var agents by remember { mutableStateOf<List<dev.dagent.core.tools.ManusClient.Agent>>(emptyList()) }
+    var note by remember { mutableStateOf("") }
+    var cap by remember { mutableStateOf(g.connectors.manusCap.toString()) }
+    Section("Manus agent")
+    Card {
+        Muted("Let your own Manus agent do jobs for ${g.settings.current.persona.name}, like phoning a place from your Manus phone number and reporting back. D-Agent sends the job to your agent and reads its answer. It uses your Manus plan's minutes and credits, and asks you before every call or job.")
+        OutlinedTextField(key, { key = it.trim(); g.connectors.manusKey = key }, label = { Text("Manus API key") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://manus.im/app#settings/developers"))) }) { Text("Get a key") }
+            OutlinedButton({
+                note = "Looking for your agents…"
+                scope.launch {
+                    runCatching { g.connectorHub.manusClient().agents() }
+                        .onSuccess { agents = it; note = if (it.isEmpty()) "No custom agents found, so your main Manus agent will be used." else "Pick the agent that has your phone number." }
+                        .onFailure { note = it.message ?: "Couldn't reach Manus." }
+                }
+            }, enabled = key.isNotBlank()) { Text("Find my agents") }
+        }
+        Muted("Agent: " + agentName.ifBlank { "your main Manus agent" })
+        if (agents.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(g.connectors.manusAgent.isBlank(), { g.connectors.manusAgent = ""; g.connectors.manusAgentName = ""; agentName = "" }, label = { Text("Main agent") })
+            agents.forEach { a ->
+                FilterChip(g.connectors.manusAgent == a.taskId, {
+                    g.connectors.manusAgent = a.taskId; g.connectors.manusAgentName = a.nickname.ifBlank { a.id }; agentName = g.connectors.manusAgentName
+                }, label = { Text(a.nickname.ifBlank { a.id }) })
+            }
+        }
+        if (note.isNotBlank()) Muted(note)
+        OutlinedTextField(cap, { v ->
+            cap = v.filter { it.isDigit() }.take(4)
+            cap.toIntOrNull()?.let { g.connectors.manusCap = it }
+        }, label = { Text("Most calls per month (0 = no limit)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        val c = g.connectors.manusCalls
+        Muted(if (c.cap() > 0) "This month: ${c.used()} of ${c.cap()} calls. It resets on the 1st." else "No monthly call limit is set.")
     }
 }
 

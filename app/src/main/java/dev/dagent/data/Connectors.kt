@@ -62,6 +62,30 @@ class Connectors(context: Context, private val settings: Settings) {
         limit = { aiCallCap },
     )
 
+    /** The person's own Manus agent (its API key, which agent, and a monthly call limit). */
+    var manusKey: String
+        get() = settings.secret("manus")
+        set(v) = settings.setSecret("manus", v)
+
+    /** The chosen agent's main task id; blank means Manus's default agent. */
+    var manusAgent: String
+        get() = prefs.getString("manus.agent", "")!!
+        set(v) { prefs.edit().putString("manus.agent", v.trim()).apply() }
+    var manusAgentName: String
+        get() = prefs.getString("manus.agent_name", "")!!
+        set(v) { prefs.edit().putString("manus.agent_name", v).apply() }
+
+    /** Most calls the Manus agent may make for D-Agent each month (0 = no limit). */
+    var manusCap: Int
+        get() = prefs.getInt("manus.cap", 20)
+        set(v) { prefs.edit().putInt("manus.cap", v.coerceAtLeast(0)).apply() }
+
+    val manusCalls = dev.dagent.core.tools.MonthlyCount(
+        load = { prefs.getString("manus.calls", "")!! },
+        save = { prefs.edit().putString("manus.calls", it).commit() },
+        limit = { manusCap },
+    )
+
     /** The person's own details for checkout forms and for saying who a call is for. */
     var myName: String
         get() = settings.secret("me.name")

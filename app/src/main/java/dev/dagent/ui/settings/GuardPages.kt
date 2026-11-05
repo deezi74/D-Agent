@@ -42,6 +42,7 @@ private val GUARDED_TOOLS = listOf(
     "browser" to "Web browser (clicking, typing, ordering)",
     "phone" to "Phone actions (texts, calls, alarms, calendar)",
     "ai_call" to "AI phone calls",
+    "manus" to "Your Manus agent",
     "email" to "Email",
     "github" to "GitHub",
     "app_builder" to "App builder",
