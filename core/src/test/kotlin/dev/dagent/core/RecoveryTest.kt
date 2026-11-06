@@ -51,3 +51,11 @@ class RecoveryTest {
         assertTrue((ContextLimits.get("m") ?: Int.MAX_VALUE) < 240_000)
     }
 }
+
+class BrokenToolCallTest {
+    @org.junit.Test fun spotsGarbledCalls() {
+        val msg = "⚠ Could not execute tool(s): \"action\": value \"writeEND_ARG\\n@@ARG\" not in enum [\"run\",\"write\"]"
+        org.junit.Assert.assertNotNull(dev.dagent.core.agent.brokenToolCall(msg))
+        org.junit.Assert.assertNull(dev.dagent.core.agent.brokenToolCall("Here is your app. It's done."))
+    }
+}

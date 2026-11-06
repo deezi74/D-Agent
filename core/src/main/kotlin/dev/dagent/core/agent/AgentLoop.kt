@@ -70,6 +70,7 @@ class AgentLoop(
         guard?.request = history.lastOrNull { it.role == Role.USER }?.text.orEmpty()
         val seen = HashMap<String, Int>()
         var step = 0
+        var repairs = 0
         while (true) {
             step++
             val lastStep = step >= options.maxSteps
@@ -94,7 +95,18 @@ class AgentLoop(
             val reply = streamWithRetry(request, offerTools) ?: continue
             transcript += reply
             emit(AgentEvent.Message(reply))
-            if (reply.toolCalls.isEmpty()) break
+            if (reply.toolCalls.isEmpty()) {
+                // Some providers turn a garbled tool call into an error message and hand that back as the
+                // answer. Tell the model what went wrong and let it try the call again instead of stopping.
+                val err = brokenToolCall(reply.text)
+                if (offerTools && err != null && repairs < 2) {
+                    repairs++
+                    emit(AgentEvent.Notice("The AI's tool request came out garbled. Asking it to try again..."))
+                    transcript += Msg.user(repairNote(err))
+                    continue
+                }
+                break
+            }
 
             for (batch in batches(reply.toolCalls)) {
                 for ((call, result) in runBatch(batch, ctx, seen)) {
@@ -357,3 +369,16 @@ class ThinkSplitter {
         fun strip(text: String): String = text.replace(Regex("<think>[\\s\\S]*?(</think>|$)"), "").trimStart()
     }
 }
+
+private val BROKEN_CALL = Regex("""(?i)could not execute tool|not in enum|failed to parse tool call|invalid tool call|tool call (was )?malformed|END_ARG|@@ARG""")
+
+/** The provider's complaint when the model's tool call came out garbled, or null. Only short replies count. */
+internal fun brokenToolCall(text: String): String? =
+    text.trim().takeIf { it.length < 1500 && BROKEN_CALL.containsMatchIn(it) }
+
+internal fun repairNote(err: String) =
+    "(Note from the app, not the person) Your last tool call didn't go through: ${err.take(400)}\n" +
+        "Call the tool again with clean JSON arguments: one plain value per field, the action exactly as listed " +
+        "(for example {\"action\": \"write\", \"path\": \"app/build.gradle\", \"content\": \"...\"}), no END_ARG or @@ARG markers. " +
+        "Write big files one at a time."
+
