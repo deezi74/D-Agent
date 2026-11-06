@@ -168,6 +168,14 @@
   "kids": {
    "art": "a friendly cartoon owl wearing glasses helping a child with homework at a desk, colorful school supplies, cheerful",
    "seed": 2517
+  },
+  "forge": {
+   "art": "a glowing anvil forging a smartphone app icon, sparks flying, holographic code panels and gears around it, workshop at night",
+   "seed": 2211
+  },
+  "sitesmith": {
+   "art": "a craftsman assembling a bright website from floating panels, buttons and photos on a giant tablet, city lights behind",
+   "seed": 2212
   }
  }
 }
