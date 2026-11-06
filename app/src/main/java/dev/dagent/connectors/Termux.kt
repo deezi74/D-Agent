@@ -371,7 +371,8 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
             mkdir -p ~/.dagent
             cd ~/freellmapi 2>/dev/null || { echo NO_DIR; exit 0; }
             command -v termux-wake-lock >/dev/null && termux-wake-lock
-            setsid nohup bash -c '[ -d node_modules ] || npm install; exec npm run dev' > ~/.dagent/freellmapi.log 2>&1 < /dev/null &
+            S=""; command -v setsid >/dev/null && S=setsid
+            ${'$'}S nohup bash -c '[ -d node_modules ] || npm install; exec npm run dev' > ~/.dagent/freellmapi.log 2>&1 < /dev/null &
             echo STARTED
         """.trimIndent()
 
