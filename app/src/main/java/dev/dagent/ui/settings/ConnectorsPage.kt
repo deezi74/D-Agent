@@ -187,6 +187,14 @@ private fun CallsSection(g: Graph) {
     Section("AI phone calls")
     Card {
         Muted("Let ${g.settings.current.persona.name} call a place and talk for you (\"call Waffle House and ask if they have eggs\"), then tell you what they said. Android doesn't let apps speak into a normal SIM call, so the call goes out from Bland AI's line using your own key. Calls cost about 9 cents a minute on their side. It always says it's an AI assistant and asks you before every call.")
+        var caller by remember { mutableStateOf(g.connectors.aiCaller) }
+        Text("Who makes your calls", fontWeight = FontWeight.SemiBold)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("auto" to "Auto", "manus" to "Manus agent", "ai_call" to "Bland AI", "phone" to "My phone (I talk)", "ask" to "Ask me each time").forEach { (id, label) ->
+                FilterChip(caller == id, { caller = id; g.connectors.aiCaller = id }, label = { Text(label) })
+            }
+        }
+        Muted("Auto lets a bot do the talking when you ask it to tell or ask someone something (your Manus agent first, then Bland), and dials from your own phone when you want to talk. My phone always dials from your own number. Ask me each time pops up a choice before every call. Texts always go from your own number. Grok and Muse don't offer phone calls to other apps yet; any that do later can be added here.")
         OutlinedTextField(key, { key = it.trim(); g.connectors.aiCallKey = key }, label = { Text("Bland AI API key") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         OutlinedButton({ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://app.bland.ai"))) }) { Text("Get a key") }
         var cap by remember { mutableStateOf(g.connectors.aiCallCap.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }) }

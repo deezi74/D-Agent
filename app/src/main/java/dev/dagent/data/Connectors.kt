@@ -62,6 +62,21 @@ class Connectors(context: Context, private val settings: Settings) {
         limit = { aiCallCap },
     )
 
+    /** Who makes calls: "auto", "manus", "ai_call" (Bland), "phone" (your own phone, you talk) or "ask" (each time). */
+    var aiCaller: String
+        get() = prefs.getString("ai_caller", "auto")!!
+        set(v) { prefs.edit().putString("ai_caller", v).apply() }
+
+    /** The tool that should make AI-talking calls right now, or null when none is set up. */
+    fun aiCallerTool(): String? {
+        val ready = listOfNotNull("manus".takeIf { manusKey.isNotBlank() }, "ai_call".takeIf { aiCallKey.isNotBlank() })
+        if (aiCaller == "phone") return null
+        return aiCaller.takeIf { it in ready } ?: ready.firstOrNull()
+    }
+
+    /** True when the person wants to pick bot or own phone for every call. */
+    fun askWhoCalls(): Boolean = aiCaller == "ask"
+
     /** The person's own Manus agent (its API key, which agent, and a monthly call limit). */
     var manusKey: String
         get() = settings.secret("manus")

@@ -153,6 +153,8 @@ class MonthlyCount(
     @Synchronized fun add() = save("${month()};${used() + 1}")
 }
 
+private val SMS = Regex("""\b(send|shoot)\b.{0,30}\b(text|sms|message)\b|\btext (him|her|them|my|mom|dad)\b""", RegexOption.IGNORE_CASE)
+
 class ManusTool(
     private val client: ManusClient,
     private val agentTask: () -> String,
@@ -165,7 +167,7 @@ class ManusTool(
     override val description =
         "The person's own Manus agent (it has its own US phone number). call: have it phone a place from its number and report back " +
             "(to = number or contact name, place, task: what to say or find out). ask: hand it any other job in plain words (text). reply: answer a question it asked (text). " +
-            "status: read its latest answer. Every call and job needs the person's OK. Use this for calls when the person asks for their Manus agent or number."
+            "status: read its latest answer. Never use it for texts/SMS: those go from the person's own number with phone sms_send. Every call and job needs the person's OK. Use this for calls when the person asks for their Manus agent or number."
     override val parameters = schema {
         title()
         string("action", "call, ask, reply or status.", required = true, enum = listOf("call", "ask", "reply", "status"))
@@ -182,7 +184,9 @@ class ManusTool(
             when (args.string("action")) {
                 "status" -> status()
                 "reply" -> job(args.requireString("text"), "Send your Manus agent this answer?", args.requireString("text"), ctx, counts = false)
-                "ask" -> job(args.requireString("text"), "Give your Manus agent this job?", args.requireString("text") + "\nIt uses your Manus credits.", ctx, counts = false)
+                "ask" -> if (SMS.containsMatchIn(args.requireString("text"))) ToolResult.ok(
+                    "Not sent to Manus. Texts go from the person's own number: use phone sms_send (to = name or number, text = the message).")
+                else job(args.requireString("text"), "Give your Manus agent this job?", args.requireString("text") + "\nIt uses your Manus credits.", ctx, counts = false)
                 else -> call(args, ctx)
             }
         } catch (e: Exception) {

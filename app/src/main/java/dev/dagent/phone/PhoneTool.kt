@@ -10,10 +10,15 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /** [aiCaller] names the tool that can phone someone and talk for the person (manus or ai_call), when one is set up. */
-class PhoneTool(private val phone: PhoneActions, private val aiCaller: () -> String? = { null }) : Tool {
+class PhoneTool(
+    private val phone: PhoneActions,
+    private val aiCaller: () -> String? = { null },
+    /** Ask the person each time whether a bot makes the call or they do. */
+    private val askEachTime: () -> Boolean = { false },
+) : Tool {
     override val name = "phone"
     override val description = "Use the phone: " + phone.actions.joinToString("; ") { "${it.name} (${it.usage})" } +
-        ". Texts, calls and calendar changes ask the person first. call only dials so the person talks themselves; " +
+        ". Texts, calls and calendar changes ask the person first. Texts (sms_send) always go from the person's own number and SIM. call only dials so the person talks themselves; " +
         "if the AI should talk for them (tell someone something, ask a question, book something), use manus or ai_call instead."
     override val parameters = schema {
         title()
@@ -44,9 +49,18 @@ class PhoneTool(private val phone: PhoneActions, private val aiCaller: () -> Str
     override suspend fun run(args: Args, ctx: ToolContext): ToolResult {
         val action = args.requireString("action")
         val ai = aiCaller()
-        if (action == "call" && ai != null && args.bool("self") != true) {
+        val useBot = when {
+            action != "call" || ai == null || args.bool("self") == true -> false
+            askEachTime() -> ctx.confirm(
+                "Should your AI make this call and talk for you?",
+                "Yes: " + (if (ai == "manus") "your Manus agent calls from its own number" else "Bland AI calls from its line") + " and does the talking.\n" +
+                    "No: your phone dials from your own number and you talk.")
+            else -> true
+        }
+        if (useBot) {
             return ToolResult.ok(
-                "Not dialed. If the person wants the AI to do the talking (\"call X and tell her...\", \"ask them...\"), use the $ai tool " +
+                (if (askEachTime()) "Not dialed: the person chose to have the AI make this call. " else "Not dialed. ") +
+                "If the person wants the AI to do the talking (\"call X and tell her...\", \"ask them...\"), use the $ai tool " +
                     "with action call, to = the number or contact name, and task = what to say or find out; it calls from " +
                     (if (ai == "manus") "their Manus agent's own number" else "the AI caller's line") + " and talks for them. " +
                     "Only if they want to talk themselves, call phone again with self = true.")
