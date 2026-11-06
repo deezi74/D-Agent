@@ -299,11 +299,17 @@ class ConnectorHub(private val g: Graph) {
             status = { if (g.connectors.aiCallKey.isNotBlank()) ConnectorStatus.CONNECTED else ConnectorStatus.needsSignIn() }))
         registry.register(Connector("manus", "Manus agent", AuthType.API_KEY,
             provider = ToolProvider.of {
-                listOf(dev.dagent.core.tools.ManusTool(manusClient(), { g.connectors.manusAgent }, g.connectors.manusCalls) { g.connectors.ownerName() })
+                listOf(dev.dagent.core.tools.ManusTool(manusClient(), { g.connectors.manusAgent }, g.connectors.manusCalls, ::contactNumber) { g.connectors.ownerName() })
             },
             status = { if (g.connectors.manusKey.isNotBlank()) ConnectorStatus.CONNECTED else ConnectorStatus.needsSignIn() }))
         servers().forEach(::registerMcp)
     }
+
+    /** First phone number of the best-matching contact, or null. */
+    private suspend fun contactNumber(name: String): String? = runCatching {
+        val text = g.phone.run("contacts_search", mapOf("query" to name.removePrefix("my ").trim()))
+        Regex("""\+?\d[\d ()\-.]{8,}\d""").find(text)?.value
+    }.getOrNull()
 
     fun manusClient() = dev.dagent.core.tools.ManusClient({ g.connectors.manusKey }, http = g.http)
 

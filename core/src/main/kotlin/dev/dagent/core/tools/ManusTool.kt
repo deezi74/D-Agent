@@ -157,18 +157,20 @@ class ManusTool(
     private val client: ManusClient,
     private val agentTask: () -> String,
     private val calls: MonthlyCount? = null,
+    /** Turns a contact name ("my wife", "Mom") into a number, or null. */
+    private val lookup: suspend (String) -> String? = { null },
     private val owner: () -> String,
 ) : Tool {
     override val name = "manus"
     override val description =
         "The person's own Manus agent (it has its own US phone number). call: have it phone a place from its number and report back " +
-            "(to = number, place, task). ask: hand it any other job in plain words (text). reply: answer a question it asked (text). " +
+            "(to = number or contact name, place, task: what to say or find out). ask: hand it any other job in plain words (text). reply: answer a question it asked (text). " +
             "status: read its latest answer. Every call and job needs the person's OK. Use this for calls when the person asks for their Manus agent or number."
     override val parameters = schema {
         title()
         string("action", "call, ask, reply or status.", required = true, enum = listOf("call", "ask", "reply", "status"))
-        string("to", "call: phone number, e.g. +1 404 555 0100.")
-        string("place", "call: who you're calling.")
+        string("to", "call: phone number (e.g. +1 404 555 0100) or a contact's name.")
+        string("place", "call: who you're calling (a place or a person's name).")
         string("task", "call: what to ask or arrange.")
         string("text", "ask/reply: the message for the Manus agent.")
         integer("max_minutes", "call: keep the call under this many minutes (default 5).")
@@ -189,9 +191,11 @@ class ManusTool(
     }
 
     private suspend fun call(args: Args, ctx: ToolContext): ToolResult {
-        val to = AiCallClient.e164(args.requireString("to")) ?: return ToolResult.error("That doesn't look like a phone number. Use the full number with area code.")
+        val raw = args.requireString("to")
+        val to = AiCallClient.e164(raw) ?: lookup(raw)?.let { AiCallClient.e164(it) }
+            ?: return ToolResult.error("I couldn't find a number for \"$raw\". Look it up (phone contacts_search with their name) or ask the person for it.")
         val task = args.requireString("task")
-        val who = args.string("place")?.takeIf { it.isNotBlank() } ?: to
+        val who = args.string("place")?.takeIf { it.isNotBlank() } ?: if (AiCallClient.e164(raw) == null) raw else to
         calls?.let {
             if (it.left() < 1) return ToolResult.error(
                 "The monthly limit of ${it.cap()} Manus calls is used up. It resets on the 1st, or the person can raise it in Settings > Connectors > Manus agent.")

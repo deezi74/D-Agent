@@ -424,7 +424,13 @@ class AgentRunner(private val g: Graph) {
             FileEditTool(ws),
             FileListTool(ws),
             BrowserTool(g.browser, { g.connectors.detailsText() }) { vision },
-            PhoneTool(g.phone),
+            PhoneTool(g.phone) {
+                when {
+                    g.connectors.manusKey.isNotBlank() -> "manus"
+                    g.connectors.aiCallKey.isNotBlank() -> "ai_call"
+                    else -> null
+                }
+            },
             ScheduleTool(g.scheduler),
             SkillTool(g.skills),
         )

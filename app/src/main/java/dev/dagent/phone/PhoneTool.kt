@@ -9,10 +9,12 @@ import dev.dagent.core.agent.title
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
-class PhoneTool(private val phone: PhoneActions) : Tool {
+/** [aiCaller] names the tool that can phone someone and talk for the person (manus or ai_call), when one is set up. */
+class PhoneTool(private val phone: PhoneActions, private val aiCaller: () -> String? = { null }) : Tool {
     override val name = "phone"
     override val description = "Use the phone: " + phone.actions.joinToString("; ") { "${it.name} (${it.usage})" } +
-        ". Texts, calls and calendar changes ask the person first."
+        ". Texts, calls and calendar changes ask the person first. call only dials so the person talks themselves; " +
+        "if the AI should talk for them (tell someone something, ask a question, book something), use manus or ai_call instead."
     override val parameters = schema {
         title()
         string("action", "Which action.", required = true, enum = phone.actions.map { it.name })
@@ -35,13 +37,22 @@ class PhoneTool(private val phone: PhoneActions) : Tool {
         string("mode", "maps: search or navigate.")
         boolean("on", "flashlight on or off.")
         integer("level", "Volume 0 to 100.")
+        boolean("self", "call: true only when the person will talk on the call themselves.")
         string("sim", "SIM slot for call or sms_send: 1 or 2. Leave out to use the default.")
     }
 
     override suspend fun run(args: Args, ctx: ToolContext): ToolResult {
         val action = args.requireString("action")
+        val ai = aiCaller()
+        if (action == "call" && ai != null && args.bool("self") != true) {
+            return ToolResult.ok(
+                "Not dialed. If the person wants the AI to do the talking (\"call X and tell her...\", \"ask them...\"), use the $ai tool " +
+                    "with action call, to = the number or contact name, and task = what to say or find out; it calls from " +
+                    (if (ai == "manus") "their Manus agent's own number" else "the AI caller's line") + " and talks for them. " +
+                    "Only if they want to talk themselves, call phone again with self = true.")
+        }
         val keepTitle = action == "notify" || action == "calendar_add"
-        val map = args.raw.filterKeys { it != "action" && (it != "title" || keepTitle) }
+        val map = args.raw.filterKeys { it != "action" && it != "self" && (it != "title" || keepTitle) }
             .mapValues { (_, v) -> (v as? JsonPrimitive)?.contentOrNull ?: v.toString() }
         // "title" doubles as the step title; for notify and calendar_add it is the real title.
         val fixed = if (action == "notify" && map["text"] == null) map + ("text" to (args.string("body") ?: "")) else map
