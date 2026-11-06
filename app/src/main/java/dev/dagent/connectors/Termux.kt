@@ -215,11 +215,17 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
             return ToolResult.ok(NOT_ANSWERING + " For now I copied the start command and opened Termux: long-press, Paste, Enter.")
         }
         ctx.progress("Starting FreeLLMAPI in Termux...")
-        termux.openSession(FREELLMAPI_SCRIPT, "FreeLLMAPI")?.let { err ->
-            termux.pasteFallback(FREELLMAPI_START)
-            return ToolResult.ok("Termux didn't take the command ($err$SETUP_HINT). I copied the start command and opened Termux so the person can paste it and press Enter.")
+        // Start it in the background (no Termux window, so Android can't block it); it keeps running
+        // detached under Termux's wake lock. Only if that fails, open a visible Termux session.
+        val bg = termux.run(FREELLMAPI_BACKGROUND, 20_000)
+        if (bg.stdout.contains("NO_DIR")) return ToolResult.error("There's no ~/freellmapi folder in Termux, so there's nothing to start. Clone FreeLLMAPI into ~/freellmapi first.")
+        if (!bg.stdout.contains("STARTED")) {
+            termux.openSession(FREELLMAPI_SCRIPT, "FreeLLMAPI")?.let { err ->
+                termux.pasteFallback(FREELLMAPI_START)
+                return ToolResult.ok("Termux didn't take the command ($err$SETUP_HINT). I copied the start command and opened Termux so the person can paste it and press Enter.")
+            }
         }
-        val deadline = System.currentTimeMillis() + 90_000
+        val deadline = System.currentTimeMillis() + 150_000
         while (System.currentTimeMillis() < deadline) {
             kotlinx.coroutines.delay(2_000)
             if (termux.portOpen(3001)) return ToolResult.ok("FreeLLMAPI is running on http://localhost:3001/v1 (a Termux session named FreeLLMAPI keeps it going).")
@@ -227,7 +233,7 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
         val log = termux.run("ls -d ~/freellmapi >/dev/null 2>&1 && echo HAS_DIR || echo NO_DIR; tail -n 15 ~/.dagent/freellmapi.log 2>/dev/null", 15_000)
         if (log.stdout.contains("NO_DIR")) return ToolResult.error("There's no ~/freellmapi folder in Termux, so there's nothing to start. Clone FreeLLMAPI into ~/freellmapi first.")
         val tail = log.stdout.substringAfter("HAS_DIR").trim().takeLast(1500)
-        return ToolResult.error("Started FreeLLMAPI in Termux but port 3001 didn't open within 90 seconds." +
+        return ToolResult.error("Started FreeLLMAPI in Termux but port 3001 didn't open within 2.5 minutes." +
             (if (tail.isNotBlank()) " Its last output:\n$tail\n" else " Ask the person to open Termux and look at the FreeLLMAPI session for the error.") +
             if (log.error != null) " (Termux also said: ${log.error}$SETUP_HINT)" else "")
     }
@@ -358,6 +364,15 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
               npm run dev
             } 2>&1 | tee ~/.dagent/freellmapi.log
             echo; echo "FreeLLMAPI stopped (see above). Press Enter to close this session."; read _
+        """.trimIndent()
+
+        /** The same start, detached in the background: survives D-Agent closing, logs to ~/.dagent/freellmapi.log. */
+        val FREELLMAPI_BACKGROUND = """
+            mkdir -p ~/.dagent
+            cd ~/freellmapi 2>/dev/null || { echo NO_DIR; exit 0; }
+            command -v termux-wake-lock >/dev/null && termux-wake-lock
+            setsid nohup bash -c '[ -d node_modules ] || npm install; exec npm run dev' > ~/.dagent/freellmapi.log 2>&1 < /dev/null &
+            echo STARTED
         """.trimIndent()
 
         /** One-time Android build setup inside Termux (aarch64): JDK, Gradle, aapt2 and the SDK platform. */
