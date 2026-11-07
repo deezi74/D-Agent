@@ -225,6 +225,7 @@ class Guard(
 
         private fun risk2(tool: String, action: String): Risk {
             return when (tool) {
+                "phone_files" -> if (action in setOf("list", "search", "space", "duplicates", "trash", "copy_to_workspace")) Risk.READ else Risk.LOCAL
                 "email" -> if (action in READ_ACTIONS || action.isBlank()) Risk.READ else Risk.LOCAL
                 "app_builder" -> if (action in READ_ACTIONS || action == "apk") Risk.READ else Risk.LOCAL
                 "pc" -> if (action in setOf("status", "task", "tasks", "wait", "get_file")) Risk.READ else Risk.LOCAL

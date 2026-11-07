@@ -425,6 +425,11 @@ class AgentRunner(private val g: Graph) {
             FileListTool(ws),
             BrowserTool(g.browser, { g.connectors.detailsText() }) { vision },
             PhoneTool(g.phone, { g.connectors.aiCallerTool() }, { g.connectors.askWhoCalls() }),
+            dev.dagent.core.tools.PhoneFilesTool(
+                dev.dagent.core.tools.PhoneFiles(android.os.Environment.getExternalStorageDirectory()),
+                { dev.dagent.phone.AllFiles.problem(g.context) },
+                java.io.File(ws.root, "uploads"),
+            ),
             ScheduleTool(g.scheduler),
             SkillTool(g.skills),
         )

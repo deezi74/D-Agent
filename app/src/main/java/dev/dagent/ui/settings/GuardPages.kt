@@ -50,6 +50,7 @@ private val GUARDED_TOOLS = listOf(
     "shell" to "Linux computer commands",
     "termux" to "Termux commands",
     "file_write" to "Writing files",
+    "phone_files" to "Your phone's files (move, rename, delete)",
     "schedule" to "Scheduling tasks",
     "web_fetch" to "Opening web pages",
     "make_image" to "Making pictures",

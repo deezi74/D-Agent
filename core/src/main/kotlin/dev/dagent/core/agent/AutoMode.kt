@@ -10,7 +10,7 @@ import dev.dagent.core.llm.Role
  */
 object AutoMode {
     /** Tools only Agent mode has; using one recently keeps follow-ups in Agent. */
-    val AGENT_ONLY = setOf("shell", "shell_job", "file_read", "file_write", "file_edit", "file_list", "browser", "phone", "schedule", "skill", "plan", "forget", "reverse")
+    val AGENT_ONLY = setOf("shell", "shell_job", "file_read", "file_write", "file_edit", "file_list", "browser", "phone", "schedule", "skill", "plan", "forget", "reverse", "phone_files")
 
     private val DO = Regex(
         "\\b(" +
@@ -19,7 +19,7 @@ object AutoMode {
             // web and shopping
             "browse|go to|log ?in|sign ?in|fill (out|in)|order|buy|purchase|checkout|add to cart|book|reserve|reservation|track (my|the) (order|package)|price|" +
             // files and computers
-            "file|files|folder|pdf|docx?|spreadsheet|csv|zip|upload|download|save (it|this|that)|workspace|" +
+            "file|files|folder|storage|space|duplicates?|clean ?up|declutter|delete|photos|downloads|pdf|docx?|spreadsheet|csv|zip|upload|download|save (it|this|that)|workspace|" +
             "install|run|execute|command|terminal|termux|linux|shell|script|code|program|compile|debug|fix (the|my|this)|deploy|server|" +
             "pc|computer|laptop|github|repo|apk|app\\b|build|develop|decompile|disassemble|reverse engineer|binary|firmware|crackme|" +
             // multi-step work

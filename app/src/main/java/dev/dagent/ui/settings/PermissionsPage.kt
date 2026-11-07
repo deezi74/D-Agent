@@ -84,6 +84,16 @@ fun PermissionsPage(g: Graph, back: () -> Unit) {
                 }
             }
         }
+        Card {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Your phone's files", color = p.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text("Lets ${g.settings.current.persona.name} look through Download, DCIM, Documents and more, and organize or clean up when you ask. Moves and deletes always ask first, and deleted files sit in a Trash for 30 days.", color = p.muted, fontSize = 13.sp)
+                }
+                if (t >= 0 && dev.dagent.phone.AllFiles.granted(context)) Text("Allowed", color = p.accent, fontSize = 13.sp)
+                else OutlinedButton({ dev.dagent.phone.AllFiles.open(context) }) { Text("Allow") }
+            }
+        }
         Muted("If Allow does nothing, Android has stopped asking. Turn it on in the app's settings instead.")
         OutlinedButton({ openAppSettings() }) { Text("Open Android app settings") }
     }
