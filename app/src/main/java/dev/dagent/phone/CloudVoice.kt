@@ -26,6 +26,7 @@ class CloudVoice(private val settings: Settings, private val cacheDir: File, htt
     /** Starts the Termux voice server when it isn't running; true once it answers. Set by the app. */
     var startTermuxVoice: (suspend () -> Boolean)? = null
     private val startLock = kotlinx.coroutines.sync.Mutex()
+    @Volatile private var lastStart = 0L
     private val http = http.newBuilder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(45, TimeUnit.SECONDS).build()
 
     data class Option(val id: String, val label: String, val voices: List<Pair<String, String>>)
@@ -89,7 +90,11 @@ class CloudVoice(private val settings: Settings, private val cacheDir: File, htt
         val call = try { http.newCall(request).execute() } catch (e: java.net.ConnectException) {
             if (s.voiceProvider != TERMUX) throw e
             // The free voice server isn't up (Termux closed it): start it once and try again.
-            val started = startLock.withLock { startTermuxVoice?.invoke() ?: false }
+            // At most one start try every 3 minutes, so a broken setup can't keep poking Termux.
+            val started = startLock.withLock {
+                val now = System.currentTimeMillis()
+                if (now - lastStart < 180_000) false else { lastStart = now; startTermuxVoice?.invoke() ?: false }
+            }
             if (!started) throw IOException("The free voice isn't running in Termux. Open Settings > Voice and tap \"Set up free voice in Termux\".")
             http.newCall(request.newBuilder().build()).execute()
         }

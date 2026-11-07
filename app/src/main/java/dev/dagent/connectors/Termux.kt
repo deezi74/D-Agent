@@ -251,14 +251,21 @@ class TermuxTool(private val termux: TermuxBridge, private val enabled: () -> Bo
         val b64 = Base64.encodeToString(VOICE_SERVER_PY.toByteArray(), Base64.NO_WRAP)
         val script = "mkdir -p ~/.dagent/voice && echo '$b64' | base64 -d > ~/.dagent/voice/server.py && " +
             "(command -v python >/dev/null || pkg install -y python) && (python -c 'import edge_tts' 2>/dev/null || AIOHTTP_NO_EXTENSIONS=1 MULTIDICT_NO_EXTENSIONS=1 YARL_NO_EXTENSIONS=1 FROZENLIST_NO_EXTENSIONS=1 PROPCACHE_NO_EXTENSIONS=1 pip install edge-tts) && " +
-            "command -v termux-wake-lock >/dev/null && termux-wake-lock; python ~/.dagent/voice/server.py"
-        termux.openSession(script, "D-Agent voice")?.let { return ToolResult.error("Termux didn't take the command ($it$SETUP_HINT).") }
+            "command -v termux-wake-lock >/dev/null && termux-wake-lock; exec python ~/.dagent/voice/server.py"
+        // Run it in Termux's background (no Termux window popping up over D-Agent); it keeps running
+        // detached. Only if Termux won't take a background command, fall back to a visible session.
+        val b64s = Base64.encodeToString(script.toByteArray(), Base64.NO_WRAP)
+        val bg = termux.run("mkdir -p ~/.dagent/voice && echo '$b64s' | base64 -d > ~/.dagent/voice/start.sh && " +
+            "nohup bash ~/.dagent/voice/start.sh > ~/.dagent/voice/server.log 2>&1 < /dev/null & echo STARTED", 20_000)
+        if (!bg.stdout.contains("STARTED")) {
+            termux.openSession(script, "D-Agent voice")?.let { return ToolResult.error("Termux didn't take the command ($it$SETUP_HINT).") }
+        }
         val deadline = System.currentTimeMillis() + 240_000
         while (System.currentTimeMillis() < deadline) {
             kotlinx.coroutines.delay(3_000)
-            if (termux.portOpen(port)) return ToolResult.ok("The free voice is running in Termux (session \"D-Agent voice\"). Pick \"Free natural voice\" in Settings > Voice.")
+            if (termux.portOpen(port)) return ToolResult.ok("The free voice is running in Termux's background. Pick \"Free natural voice\" in Settings > Voice.")
         }
-        return ToolResult.error("The voice server didn't start within 4 minutes. Open Termux and check the \"D-Agent voice\" session for the error.")
+        return ToolResult.error("The voice server didn't start within 4 minutes. Its log is in Termux at ~/.dagent/voice/server.log.")
     }
 
     suspend fun startJob(cmd: String): ToolResult {
