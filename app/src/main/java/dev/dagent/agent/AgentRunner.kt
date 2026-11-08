@@ -429,7 +429,11 @@ class AgentRunner(private val g: Graph) {
                 dev.dagent.core.tools.PhoneFiles(android.os.Environment.getExternalStorageDirectory()),
                 { dev.dagent.phone.AllFiles.problem(g.context) },
                 java.io.File(ws.root, "uploads"),
-            ),
+            ) { changed ->
+                // Refresh Android's media index so the Gallery and Files apps match what really happened.
+                val paths = changed.flatMap { f -> if (f.isDirectory) f.walkTopDown().filter { it.isFile }.map { it.path }.toList() else listOf(f.path) }
+                if (paths.isNotEmpty()) android.media.MediaScannerConnection.scanFile(g.context, paths.take(2000).toTypedArray(), null, null)
+            },
             ScheduleTool(g.scheduler),
             SkillTool(g.skills),
         )

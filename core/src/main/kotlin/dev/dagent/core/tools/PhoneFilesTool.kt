@@ -61,6 +61,8 @@ class PhoneFiles(val root: File, private val now: () -> Long = System::currentTi
         val day = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(now()))
         val dest = unique(File(File(trash, day), f.canonicalFile.relativeTo(root.canonicalFile).path))
         dest.parentFile?.mkdirs()
+        // Keep trashed photos and videos out of the Gallery.
+        runCatching { File(trash, ".nomedia").let { if (!it.exists()) it.createNewFile() } }
         moveFile(f, dest)
         return dest
     }
@@ -133,6 +135,8 @@ class PhoneFilesTool(
     private val notAllowed: () -> String?,
     /** Where copy_to_workspace puts files (the agent's /workspace/uploads). */
     private val workspaceUploads: File? = null,
+    /** Tells Android's media index (Gallery, Files) about added and removed files. */
+    private val changed: (List<File>) -> Unit = {},
 ) : Tool {
     override val name = "phone_files"
     override val description =
@@ -279,6 +283,7 @@ class PhoneFilesTool(
         if (dest.exists()) return ToolResult.error("${files.show(dest)} already exists.")
         if (!ctx.confirm("Rename ${f.name}?", "${files.show(f)}\n→ $name")) return ToolResult.error("The person said no.")
         PhoneFiles.moveFile(f, dest)
+        changed(listOf(f, dest))
         return ToolResult.ok("Renamed to ${files.show(dest)}")
     }
 
@@ -291,6 +296,7 @@ class PhoneFilesTool(
         if (!ctx.confirm("Move ${fs.size} item(s) to ${files.show(to)}?", summary(fs))) return ToolResult.error("The person said no.")
         to.mkdirs()
         val done = fs.map { f -> PhoneFiles.unique(File(to, f.name)).also { PhoneFiles.moveFile(f, it) } }
+        changed(fs + done)
         return ToolResult.ok("Moved ${done.size} item(s) to ${files.show(to)}:\n" + done.take(50).joinToString("\n") { files.show(it) })
     }
 
@@ -304,7 +310,11 @@ class PhoneFilesTool(
         }
         var n = 0
         val failed = ArrayList<String>()
-        fs.forEach { f -> runCatching { files.toTrash(f); n++ }.onFailure { failed += "${files.show(f)} (${it.message})" } }
+        val gone = ArrayList<File>()
+        fs.forEach { f -> runCatching { files.toTrash(f); gone += f; n++ }.onFailure { failed += "${files.show(f)} (${it.message})" } }
+        changed(gone)
+        val still = gone.filter { it.exists() }
+        if (still.isNotEmpty()) failed += still.map { "${files.show(it)} (still there after moving)" }
         return ToolResult.ok("Moved $n item(s) to the Trash (${PhoneFiles.MOUNT}/${PhoneFiles.TRASH}); they're removed for good after ${PhoneFiles.KEEP_DAYS} days." +
             if (failed.isNotEmpty()) "\nCouldn't delete:\n" + failed.joinToString("\n") else "")
     }
@@ -321,6 +331,7 @@ class PhoneFilesTool(
         if (fs.isEmpty()) return ToolResult.error("Give paths inside ${PhoneFiles.MOUNT}/${PhoneFiles.TRASH} (see action trash).")
         if (!ctx.confirm("Put back ${fs.size} item(s)?", summary(fs))) return ToolResult.error("The person said no.")
         val back = fs.map { files.restore(it) }
+        changed(back)
         return ToolResult.ok("Put back:\n" + back.joinToString("\n") { files.show(it) })
     }
 
