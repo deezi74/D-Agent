@@ -510,6 +510,24 @@ class AgentRunner(private val g: Graph) {
         return final
     }
 
+    /** One spoken reply on a phone call the assistant answered: no tools, nothing saved here. */
+    suspend fun callReply(system: String, history: List<Msg>): String {
+        val provider = g.settings.provider()
+        val prefs = g.settings.current
+        if (!provider.ready) error("No AI provider is set up")
+        if (provider.id == Providers.LOCAL_ID) {
+            val file = g.local.installed().firstOrNull { it.name == prefs.localModelFile } ?: g.local.installed().first()
+            g.local.ensureRunning(file, prefs.localContext, prefs.localThreads, g.loadOpts())
+        }
+        val client = Providers.client(g.http, provider.kind, provider.baseUrl, provider.apiKey, provider.preset.reasoning, provider.preset.headers)
+        var final = ""
+        val ctx = object : ToolContext { override val sessionId = "call" }
+        AgentLoop(client, provider.model, emptyList(), AgentOptions(maxSteps = 2), null).run(system, history, ctx).collect { ev ->
+            if (ev is AgentEvent.Message && ev.msg.role == Role.ASSISTANT && ev.msg.toolCalls.isEmpty()) final = ev.msg.text
+        }
+        return final
+    }
+
     data class RemoteReply(val sessionId: String, val text: String, val files: List<File>)
 
     /**

@@ -17,6 +17,9 @@
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
@@ -115,6 +118,27 @@
             android:name=".connectors.BotService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Answer my calls: hears the phone ring, and a mic-only accessibility helper (reads no screen). -->
+        <receiver
+            android:name=".phone.calls.CallStateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name=".phone.calls.CallHelperService"
+            android:exported="false"
+            android:label="@string/call_helper_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/call_helper_config" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

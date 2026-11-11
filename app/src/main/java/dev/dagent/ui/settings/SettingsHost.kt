@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Shield
@@ -34,6 +35,7 @@ fun SettingsHost(g: Graph, page: String, open: (String) -> Unit, back: () -> Uni
         "tools" -> ToolsPage(g, back)
         "voice" -> VoicePage(g, back)
         "connectors" -> ConnectorsPage(g, back)
+        "calls" -> AnswerCallsPage(g, back)
         "tasks" -> TasksPage(g, back)
         "guard" -> GuardPage(g, open, back)
         "activity" -> ActivityPage(g, back)
@@ -60,6 +62,7 @@ private fun Home(g: Graph, open: (String) -> Unit, back: () -> Unit) {
         NavRow(Icons.Default.Cloud, "AI providers", "${provider.preset.name} · ${provider.model}") { open("providers") }
         NavRow(Icons.Default.RecordVoiceOver, "Voice", if (prefs.voiceProvider == "phone") "Phone voice · get a free on-phone voice" else "Voice · " + dev.dagent.ui.voiceLabel(g, prefs)) { open("voice") }
         NavRow(Icons.Default.Hub, "Connectors", "Your PC, email, GitHub, Telegram, Termux, calls") { open("connectors") }
+        NavRow(Icons.Default.PhoneInTalk, "Answer my calls", if (g.connectors.callAnswerOn) "On · picks up allowed callers and takes a message" else "Off · let ${prefs.persona.name} pick up and talk for you") { open("calls") }
         NavRow(Icons.Default.PhoneAndroid, "On-phone models", "Offline AI with GGUF models") { open("local") }
         NavRow(Icons.Default.Speed, "Benchmark", "How fast on-phone models run on this phone") { open("benchmark") }
         NavRow(Icons.Default.Tune, "Generation settings", "Creativity, top K/P, min P, XTC, penalties, mirostat, seed, memory") { open("generation") }

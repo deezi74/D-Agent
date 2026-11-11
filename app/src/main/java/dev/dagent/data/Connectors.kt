@@ -74,6 +74,53 @@ class Connectors(context: Context, private val settings: Settings) {
         return aiCaller.takeIf { it in ready } ?: ready.firstOrNull()
     }
 
+    /** Answering incoming calls with the assistant's voice (speakerphone mode). */
+    var callAnswerOn: Boolean
+        get() = prefs.getBoolean("answer.on", false)
+        set(v) { prefs.edit().putBoolean("answer.on", v).apply() }
+
+    /** Who gets answered: "list", "contacts" or "everyone" (see CallRules). */
+    var callAnswerWho: String
+        get() = prefs.getString("answer.who", dev.dagent.core.calls.CallRules.WHO_LIST)!!
+        set(v) { prefs.edit().putString("answer.who", v).apply() }
+
+    /** The allow list as typed: numbers separated by commas or new lines. */
+    var callAnswerList: String
+        get() = prefs.getString("answer.list", "")!!
+        set(v) { prefs.edit().putString("answer.list", v).apply() }
+
+    var callAnswerRing: Int
+        get() = prefs.getInt("answer.ring", 15)
+        set(v) { prefs.edit().putInt("answer.ring", v.coerceIn(0, 40)).apply() }
+
+    var callAnswerMax: Int
+        get() = prefs.getInt("answer.max", 5)
+        set(v) { prefs.edit().putInt("answer.max", v.coerceIn(1, 30)).apply() }
+
+    var callAnswerOwner: String
+        get() = prefs.getString("answer.owner", "")!!
+        set(v) { prefs.edit().putString("answer.owner", v.trim()).apply() }
+
+    var callAnswerGreeting: String
+        get() = prefs.getString("answer.greeting", "")!!
+        set(v) { prefs.edit().putString("answer.greeting", v.trim()).apply() }
+
+    var callAnswerNotes: String
+        get() = prefs.getString("answer.notes", "")!!
+        set(v) { prefs.edit().putString("answer.notes", v.trim()).apply() }
+
+    fun callRules(assistantName: String) = dev.dagent.core.calls.CallRules(
+        on = callAnswerOn,
+        who = callAnswerWho,
+        allow = dev.dagent.core.calls.CallAnswering.parseList(callAnswerList),
+        ringSeconds = callAnswerRing,
+        maxMinutes = callAnswerMax,
+        ownerName = callAnswerOwner,
+        assistantName = assistantName,
+        greeting = callAnswerGreeting,
+        notes = callAnswerNotes,
+    )
+
     /** True when the person wants to pick bot or own phone for every call. */
     fun askWhoCalls(): Boolean = aiCaller == "ask"
 

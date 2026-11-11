@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">D-Agent</string>
+    <string name="call_helper_label">D-Agent call helper</string>
+    <string name="call_helper_description">Lets D-Agent use the microphone during phone calls it answers for you (Settings > Answer my calls). It does not read your screen or tap anything.</string>
 </resources>

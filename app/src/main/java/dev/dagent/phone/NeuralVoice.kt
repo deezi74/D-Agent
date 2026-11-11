@@ -68,11 +68,11 @@ class NeuralVoice(val packs: VoicePackStore) {
     }
 
     /** Plays float PCM to the end (or until cancelled). */
-    suspend fun play(samples: FloatArray, rate: Int) = withContext(Dispatchers.IO) {
+    suspend fun play(samples: FloatArray, rate: Int, usage: Int = AudioAttributes.USAGE_ASSISTANT) = withContext(Dispatchers.IO) {
         if (samples.isEmpty()) return@withContext
         val min = AudioTrack.getMinBufferSize(rate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_FLOAT)
         val track = AudioTrack.Builder()
-            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(usage).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT).setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
             .setBufferSizeInBytes(maxOf(min, rate)) // about a quarter second
             .setTransferMode(AudioTrack.MODE_STREAM)
