@@ -290,7 +290,7 @@ object CallAnswerer {
         runCatching { am.isSpeakerphoneOn = true }
     }
 
-    private fun save(g: Graph, caller: String, number: String?, turns: List<Pair<Boolean, String>>, started: Long) {
+    private suspend fun save(g: Graph, caller: String, number: String?, turns: List<Pair<Boolean, String>>, started: Long) {
         if (turns.isEmpty()) return
         val assistant = g.settings.current.persona.name
         val text = CallAnswering.transcript(turns, assistant)
