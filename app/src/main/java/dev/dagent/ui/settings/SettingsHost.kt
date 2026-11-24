@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Terminal
@@ -33,6 +34,7 @@ fun SettingsHost(g: Graph, page: String, open: (String) -> Unit, back: () -> Uni
         "skills" -> SkillsPage(g, back)
         "tools" -> ToolsPage(g, back)
         "voice" -> VoicePage(g, back)
+        "assistant" -> PhoneAssistantPage(g, back)
         "connectors" -> ConnectorsPage(g, back)
         "tasks" -> TasksPage(g, back)
         "guard" -> GuardPage(g, open, back)
@@ -59,6 +61,7 @@ private fun Home(g: Graph, open: (String) -> Unit, back: () -> Unit) {
         NavRow(Icons.Default.AutoAwesome, "Dabs and D's Hub", g.activePal()?.let { "${it.emoji} ${it.name} is in charge" } ?: "Ready-made companions: coder, maker, security, business...") { open("pals") }
         NavRow(Icons.Default.Cloud, "AI providers", "${provider.preset.name} · ${provider.model}") { open("providers") }
         NavRow(Icons.Default.RecordVoiceOver, "Voice", if (prefs.voiceProvider == "phone") "Phone voice · get a free on-phone voice" else "Voice · " + dev.dagent.ui.voiceLabel(g, prefs)) { open("voice") }
+        NavRow(Icons.Default.Mic, "Phone assistant", if (dev.dagent.phone.PhoneAssistant.enabled(g.context)) "On · open ${prefs.persona.name} by voice with the assist button" else "Off") { open("assistant") }
         NavRow(Icons.Default.Hub, "Connectors", "Your PC, email, GitHub, Telegram, Termux, calls") { open("connectors") }
         NavRow(Icons.Default.PhoneAndroid, "On-phone models", "Offline AI with GGUF models") { open("local") }
         NavRow(Icons.Default.Speed, "Benchmark", "How fast on-phone models run on this phone") { open("benchmark") }

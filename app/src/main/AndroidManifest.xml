@@ -83,6 +83,26 @@
             </intent-filter>
         </activity>
 
+        <!-- Phone assistant: lets D-Agent be picked as the digital assistant app. The assist gesture
+             (long-press power/home, corner swipe) and a headset's voice button open it straight
+             into hands-free voice. Settings > Voice > Phone assistant turns this alias off and on
+             (see phone/PhoneAssistant.kt). -->
+        <activity-alias
+            android:name=".AssistantEntry"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- OAuth sign-in comes back here: Google uses the package name as its scheme
              (<package>:/oauth2redirect, as Google's Android client type requires) and MCP servers
              use dagent://oauth. The state and PKCE verifier are checked before any token is kept. -->
