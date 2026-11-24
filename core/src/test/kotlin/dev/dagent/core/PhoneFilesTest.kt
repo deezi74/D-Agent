@@ -41,7 +41,7 @@ class PhoneFilesTest {
         allow = true
         assertFalse(run("""{"action":"delete","paths":["/sdcard/Download/a.jpg"]}""").isError)
         assertFalse(File(root, "Download/a.jpg").exists())
-        val trashed = files.trash.walkTopDown().first { it.isFile }
+        val trashed = files.trash.walkTopDown().first { it.isFile && it.name != ".nomedia" }
         assertEquals("photo", trashed.readText())
         assertTrue(run("""{"action":"search","query":"a.jpg"}""").text.startsWith("0 files"))
         run("""{"action":"restore","paths":["${files.show(trashed)}"]}""")
