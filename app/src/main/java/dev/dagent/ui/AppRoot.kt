@@ -17,6 +17,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
 import dev.dagent.Graph
 import dev.dagent.ui.settings.SettingsHost
 
@@ -25,12 +29,15 @@ sealed interface Screen {
     data object Chat : Screen
     data class Settings(val page: String = "home") : Screen
     data object Voice : Screen
+    /** Voice mode opened by the phone's assist gesture; closing it sends D-Agent to the background. */
+    data object AssistVoice : Screen
     data object Discover : Screen
 }
 
 @Composable
-fun AppRoot(g: Graph, shared: MutableState<Pair<String, Uri?>?>) {
+fun AppRoot(g: Graph, shared: MutableState<Pair<String, Uri?>?>, assist: State<Int>? = null) {
     val stack = remember { mutableStateListOf<Screen>(Screen.Chat) }
+    val activity = LocalContext.current as? Activity
     val prefs by g.settings.state.collectAsState()
     val confirm by g.interactions.confirm.collectAsState()
 
@@ -38,6 +45,15 @@ fun AppRoot(g: Graph, shared: MutableState<Pair<String, Uri?>?>) {
     fun back() { if (stack.size > 1) stack.removeAt(stack.lastIndex) }
 
     BackHandler(enabled = stack.size > 1) { back() }
+
+    // The phone's assist gesture (D-Agent picked as the digital assistant): go straight to hands-free voice.
+    val assistCount = assist?.value ?: 0
+    LaunchedEffect(assistCount) {
+        if (assistCount > 0 && prefs.onboarded) {
+            stack.removeAll { it == Screen.Voice || it == Screen.AssistVoice }
+            stack.add(Screen.AssistVoice)
+        }
+    }
 
     if (!prefs.onboarded) {
         Onboarding(g) { g.settings.update { it.copy(onboarded = true) } }
@@ -47,6 +63,7 @@ fun AppRoot(g: Graph, shared: MutableState<Pair<String, Uri?>?>) {
     when (val top = stack.last()) {
         Screen.Chat -> ChatScreen(g, shared, openSettings = { go(Screen.Settings(it)) }, openVoice = { go(Screen.Voice) }, openDiscover = { go(Screen.Discover) })
         Screen.Voice -> VoiceMode(g) { back() }
+        Screen.AssistVoice -> VoiceMode(g) { back(); activity?.moveTaskToBack(true) }
         Screen.Discover -> DiscoverScreen(g, back = { back() }, startChat = { prompt -> g.runner.newChat(); shared.value = prompt to null; back() })
         is Screen.Settings -> SettingsHost(g, top.page, open = { go(Screen.Settings(it)) }, back = { back() })
     }
